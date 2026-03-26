@@ -1,0 +1,1623 @@
+<!--
+MIT License
+
+Copyright (c) 2026
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+This software uses Chart.js (https://www.chartjs.org/) - MIT License
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>製図時間管理ツール</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-input: #252833;
+  --text: #e8e8ed;
+  --text-dim: #8b8d98;
+  --accent: #4a9eff;
+  --accent-hover: #3a8eef;
+  --good: #34d399;
+  --bad: #f87171;
+  --warn: #fbbf24;
+  --border: #2a2d3a;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+.screen { display:none; padding:16px; max-width:800px; margin:0 auto; padding-bottom: 80px; }
+.screen.active { display:block; }
+#screen-timer { padding:0; padding-bottom:0; max-width:none; }
+#screen-timer.active { display:flex; }
+#screen-home {
+  display:none; height:100vh; height:100dvh; padding-bottom:16px;
+  overflow:hidden; box-sizing:border-box;
+}
+#screen-home.active {
+  display:flex; flex-direction:column; justify-content:center;
+}
+
+/* Header */
+.header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+.header h1 { font-size:1.2rem; flex:1; }
+.back-btn {
+  background:none; border:none; color:var(--text-dim); font-size:1.4rem;
+  cursor:pointer; padding:4px 8px; line-height:1;
+}
+.back-btn:hover { color:var(--text); }
+
+/* Buttons */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:14px 24px; border:none; border-radius:var(--radius);
+  font-size:1rem; font-weight:600; cursor:pointer; transition:all 0.15s;
+  text-decoration:none; color:#fff; min-height:48px;
+}
+.btn-primary { background:var(--accent); }
+.btn-primary:hover { background:var(--accent-hover); }
+.btn-good { background:var(--good); color:#000; }
+.btn-bad { background:var(--bad); color:#fff; }
+.btn-outline {
+  background:transparent; border:2px solid var(--border); color:var(--text);
+}
+.btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+.btn-danger { background:#dc2626; }
+.btn-danger:hover { background:#b91c1c; }
+.btn-block { width:100%; }
+.btn-sm { padding:8px 16px; font-size:0.85rem; min-height:36px; }
+.btn-lg { padding:18px 32px; font-size:1.2rem; min-height:56px; }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* Cards */
+.card {
+  background:var(--bg-card); border-radius:var(--radius);
+  padding:16px; margin-bottom:12px; box-shadow:var(--shadow);
+}
+
+/* Inputs */
+input[type="text"], input[type="number"], textarea, select {
+  width:100%; padding:12px; background:var(--bg-input); border:1px solid var(--border);
+  border-radius:8px; color:var(--text); font-size:1rem;
+  outline:none; transition:border-color 0.15s;
+}
+input:focus, textarea:focus, select:focus { border-color:var(--accent); }
+textarea { resize:vertical; min-height:60px; font-family:inherit; }
+select { cursor:pointer; }
+label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim); }
+.form-group { margin-bottom:16px; }
+
+/* Menu Grid */
+.menu-card-main {
+  margin-top:12px;
+}
+.menu-grid-sub {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:12px;
+}
+.menu-card {
+  background:var(--bg-card); border-radius:var(--radius); padding:20px 16px;
+  text-align:center; cursor:pointer; transition:all 0.15s; border:2px solid transparent;
+  box-shadow:var(--shadow);
+}
+.menu-card:hover { border-color:var(--accent); transform:translateY(-2px); }
+.menu-card .icon { font-size:2rem; margin-bottom:6px; }
+.menu-card .label { font-size:0.95rem; font-weight:600; }
+@media (max-height:700px) {
+  .menu-card { padding:14px 12px; }
+  .menu-card .icon { font-size:1.5rem; margin-bottom:4px; }
+  .menu-card .label { font-size:0.85rem; }
+  .menu-card-main { margin-top:8px; }
+  .menu-grid-sub { gap:8px; margin-top:8px; }
+}
+
+/* Timer Screen */
+.timer-fullscreen {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:100vh; height:100dvh; padding:12px; max-width:800px; margin:0 auto;
+  overflow:hidden;
+}
+.timer-display {
+  text-align:center; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; width:100%; min-height:0;
+}
+.timer-total {
+  font-size:clamp(5rem, 18vw, 14rem); font-weight:700; font-variant-numeric:tabular-nums;
+  letter-spacing:4px; line-height:1;
+}
+/* 工程情報と次の工程のレイアウト */
+.timer-middle {
+  display:flex; flex-direction:column; align-items:center;
+  width:100%; max-width:500px; margin-top:16px;
+}
+.timer-next {
+  flex-shrink:0; text-align:right; line-height:1.4;
+}
+/* スマホ：横並び（次の工程を右に） */
+@media (max-width:768px) {
+  .timer-middle { flex-direction:row; align-items:center; gap:12px; max-width:none; }
+  .timer-step-info { flex:1; min-width:0; }
+  .timer-next { white-space:nowrap; }
+}
+/* スマホ横向き：横幅いっぱい＋全要素を縮めて1画面に収める */
+@media (max-height:500px) {
+  .timer-total { font-size:clamp(3rem, 12vw, 8rem); letter-spacing:2px; }
+  .timer-middle { margin-top:6px; gap:10px; }
+  .timer-step-info { padding:8px; }
+  .timer-step-name { font-size:0.85rem; margin-bottom:4px; }
+  .timer-step-time { font-size:1.3rem; }
+  .timer-target { font-size:0.75rem; margin-top:2px; }
+  .timer-next { font-size:0.75rem; white-space:nowrap; }
+  .timer-controls { margin-top:6px; gap:8px; }
+  .lap-btn { font-size:1rem; padding:10px; min-height:auto; }
+  .timer-controls .btn { padding:8px 16px; min-height:auto; font-size:0.85rem; }
+  .timer-fullscreen { padding:8px; }
+}
+.key-hint-inline {
+  font-size:0.75rem; opacity:0.6; font-weight:400; letter-spacing:0.5px;
+}
+/* タブレット・スマホではキーヒント非表示 */
+@media (max-width:768px) { .key-hint-inline { display:none; } }
+@media (hover:none) and (pointer:coarse) { .key-hint-inline { display:none; } }
+.timer-step-info {
+  margin-top:16px; padding:16px; background:var(--bg-card);
+  border-radius:var(--radius); width:100%; max-width:500px;
+}
+.timer-step-name { font-size:1.1rem; font-weight:600; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.timer-step-time {
+  font-size:2rem; font-variant-numeric:tabular-nums; font-weight:600;
+}
+.timer-step-time.over { color:var(--bad); }
+.timer-target { color:var(--text-dim); font-size:0.9rem; margin-top:4px; }
+.timer-next { color:var(--text-dim); font-size:0.85rem; }
+.timer-controls {
+  display:flex; gap:12px; margin-top:12px;
+  justify-content:center; width:100%; max-width:500px;
+}
+.lap-btn {
+  background: var(--accent);
+  font-size:1.3rem; padding:20px; min-height:64px;
+  display:flex; flex-direction:column; flex:1;
+}
+.lap-btn:hover { filter:brightness(1.1); }
+.timer-controls .btn-outline,
+.timer-controls .btn-danger { display:flex; flex-direction:column; }
+.timer-paused .timer-total { opacity:0.5; animation:blink 1s infinite; }
+@keyframes blink { 50% { opacity:0.2; } }
+
+
+/* Step list in timer */
+.step-list-mini {
+  margin-top:16px; max-height:200px; overflow-y:auto;
+}
+.step-list-mini .step-item {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:6px 0; font-size:0.85rem; border-bottom:1px solid var(--border);
+}
+.step-item.done { color:var(--text-dim); }
+.step-item.current { color:var(--accent); font-weight:600; }
+.step-item .step-actual { font-variant-numeric:tabular-nums; }
+
+/* Review screen */
+.review-step {
+  background:var(--bg-card); border-radius:var(--radius);
+  padding:14px; margin-bottom:10px;
+}
+.review-step-header {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:8px; flex-wrap:wrap; gap:4px;
+}
+.review-step-name { font-weight:600; font-size:0.95rem; }
+.review-times { display:flex; gap:12px; font-size:0.85rem; }
+.review-times span { display:flex; flex-direction:column; align-items:center; }
+.review-times .time-value { font-size:1.1rem; font-weight:600; font-variant-numeric:tabular-nums; }
+.review-times .time-label { color:var(--text-dim); font-size:0.75rem; }
+.review-times .actual.over { color:var(--bad); }
+.review-times .actual.under { color:var(--good); }
+.review-rating { display:flex; gap:8px; margin:8px 0; }
+.rating-btn {
+  padding:6px 16px; border-radius:20px; border:2px solid var(--border);
+  background:transparent; color:var(--text); cursor:pointer; font-size:0.9rem;
+  transition:all 0.15s;
+}
+.rating-btn.selected-good { border-color:var(--good); background:rgba(52,211,153,0.15); color:var(--good); }
+.rating-btn.selected-bad { border-color:var(--bad); background:rgba(248,113,113,0.15); color:var(--bad); }
+.review-memo { margin-top:6px; }
+.review-memo input {
+  padding:8px 10px; font-size:0.85rem; background:var(--bg-input);
+}
+
+/* History */
+.history-card {
+  background:var(--bg-card); border-radius:var(--radius);
+  padding:16px; margin-bottom:10px; cursor:pointer;
+  transition:all 0.15s; border:1px solid transparent;
+}
+.history-card:hover { border-color:var(--border); }
+.history-card-header {
+  display:flex; justify-content:space-between; align-items:flex-start;
+}
+.history-card .task-name { font-weight:600; font-size:1rem; }
+.history-card .date { color:var(--text-dim); font-size:0.8rem; }
+.history-card .mode-badge {
+  display:inline-block; padding:2px 8px; border-radius:10px;
+  font-size:0.75rem; background:var(--bg-input); color:var(--accent);
+  margin-top:4px;
+}
+.history-card .total-time {
+  font-size:1.3rem; font-weight:700; font-variant-numeric:tabular-nums;
+  text-align:right;
+}
+.history-detail { display:none; margin-top:12px; border-top:1px solid var(--border); padding-top:12px; }
+.history-detail.open { display:block; }
+.history-detail-step {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:4px 0; font-size:0.85rem;
+}
+.history-detail-step .rating-icon { margin-left:8px; }
+
+/* Analysis */
+.filter-bar {
+  display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;
+}
+.filter-bar select { width:auto; min-width:120px; padding:8px 12px; font-size:0.85rem; }
+.chart-container { position:relative; margin-bottom:24px; background:var(--bg-card); border-radius:var(--radius); padding:16px; }
+.chart-container canvas { max-height:300px; }
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+.stat-card { background:var(--bg-card); border-radius:var(--radius); padding:16px; text-align:center; }
+.stat-card .stat-value { font-size:1.5rem; font-weight:700; color:var(--accent); }
+.stat-card .stat-label { font-size:0.8rem; color:var(--text-dim); margin-top:4px; }
+
+/* Settings - step editor */
+.step-editor-item {
+  display:flex; gap:8px; align-items:center; padding:10px;
+  background:var(--bg-card); border-radius:8px; margin-bottom:6px;
+}
+.step-editor-item input[type="text"] { flex:1; padding:8px; font-size:0.85rem; }
+.step-editor-item input[type="number"] { width:70px; padding:8px; font-size:0.85rem; text-align:center; }
+.step-editor-item .drag-handle { cursor:grab; color:var(--text-dim); font-size:1.2rem; padding:0 4px; }
+.step-editor-item .remove-btn {
+  background:none; border:none; color:var(--bad); cursor:pointer;
+  font-size:1.2rem; padding:4px 8px;
+}
+
+/* Home title */
+.home-title { text-align:center; margin:12px 0 12px; }
+@media (max-height:700px) { .home-title { margin:4px 0 8px; } }
+
+/* Home stats */
+.home-stats {
+  display:flex; gap:12px; flex-wrap:wrap;
+}
+.home-stat {
+  background:var(--bg-card); border-radius:var(--radius); padding:20px 12px;
+  flex:1; min-width:0; text-align:center;
+}
+.home-stat .value { font-size:2.8rem; font-weight:700; color:var(--accent); }
+.home-stat .label { font-size:0.9rem; color:var(--text-dim); margin-top:6px; }
+.home-stat .best-time {
+  font-size:0.95rem; color:var(--accent); margin-top:8px;
+  font-variant-numeric:tabular-nums; font-weight:600;
+}
+/* スマホ縦：各statを横長1行ずつ */
+@media (max-width:480px) {
+  .home-stats { flex-direction:column; gap:8px; }
+  .home-stat {
+    display:flex; align-items:center; padding:12px 16px; text-align:left; gap:12px;
+  }
+  .home-stat .label { font-size:0.9rem; margin:0; order:0; width:5em; }
+  .home-stat .value { font-size:2rem; margin:0; order:1; flex:1; text-align:center; }
+  .home-stat .best-time { font-size:0.85rem; margin:0; order:2; white-space:nowrap; }
+}
+@media (max-height:700px) {
+  .home-stats { gap:8px; }
+  .home-stat { padding:12px 8px; }
+  .home-stat .value { font-size:2rem; }
+  .home-stat .label { font-size:0.75rem; margin-top:2px; }
+  .home-stat .best-time { font-size:0.75rem; margin-top:4px; }
+}
+
+/* Best time animation */
+.best-time-overlay {
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.7); display:flex; align-items:center;
+  justify-content:center; z-index:1000; opacity:0; pointer-events:none;
+  transition:opacity 0.3s;
+}
+.best-time-overlay.show { opacity:1; pointer-events:auto; }
+.best-time-content {
+  text-align:center; animation:popIn 0.5s ease;
+}
+.best-time-content .trophy { font-size:4rem; }
+.best-time-content .message { font-size:1.5rem; font-weight:700; margin-top:12px; color:var(--warn); }
+.best-time-content .detail { color:var(--text-dim); margin-top:8px; }
+@keyframes popIn { 0%{transform:scale(0.5);opacity:0} 100%{transform:scale(1);opacity:1} }
+
+/* Empty state */
+.empty-state { text-align:center; padding:40px 20px; color:var(--text-dim); }
+.empty-state .icon { font-size:3rem; margin-bottom:12px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:var(--bg); }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+/* Tab bar */
+.tab-bar {
+  display:flex; gap:4px; margin-bottom:16px; overflow-x:auto;
+}
+.tab-btn {
+  padding:8px 16px; border:none; background:var(--bg-input); color:var(--text-dim);
+  border-radius:8px; cursor:pointer; font-size:0.85rem; white-space:nowrap;
+  transition:all 0.15s;
+}
+.tab-btn.active { background:var(--accent); color:#fff; }
+
+/* Confirm dialog */
+.confirm-overlay {
+  position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.6); display:flex; align-items:center;
+  justify-content:center; z-index:1000;
+}
+.confirm-box {
+  background:var(--bg-card); border-radius:var(--radius); padding:24px;
+  max-width:360px; width:90%; text-align:center;
+}
+.confirm-box p { margin-bottom:16px; }
+.confirm-box .btns { display:flex; gap:8px; justify-content:center; }
+</style>
+</head>
+<body>
+
+<!-- ===== HOME ===== -->
+<div id="screen-home" class="screen active">
+  <div class="home-title">
+    <h1 style="font-size:1.4rem;">製図時間管理ツール</h1>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">一級建築士 製図試験</p>
+  </div>
+  <div class="home-stats" id="home-stats"></div>
+  <div class="menu-card menu-card-main" onclick="showScreen('setup')">
+    <div class="icon">&#9201;</div>
+    <div class="label">新規セッション</div>
+  </div>
+  <div class="menu-grid-sub">
+    <div class="menu-card" onclick="showScreen('history')">
+      <div class="icon">&#128203;</div>
+      <div class="label">履歴</div>
+    </div>
+    <div class="menu-card" onclick="showScreen('analysis')">
+      <div class="icon">&#128200;</div>
+      <div class="label">分析</div>
+    </div>
+    <div class="menu-card" onclick="showScreen('settings')">
+      <div class="icon">&#9881;</div>
+      <div class="label">設定</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SESSION SETUP ===== -->
+<div id="screen-setup" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">&larr;</button>
+    <h1>セッション設定</h1>
+  </div>
+  <div class="form-group">
+    <label>課題名</label>
+    <input type="text" id="setup-task" placeholder="例：課題No.3 福祉施設" list="task-suggestions" autocomplete="off">
+    <datalist id="task-suggestions"></datalist>
+  </div>
+  <div class="form-group">
+    <label>モード</label>
+    <select id="setup-mode" onchange="updateSetupPreview()">
+      <option value="full">フルモード（390分）</option>
+      <option value="esquisse">エスキスのみ（150分）</option>
+      <option value="drawing">作図のみ（180分）</option>
+      <option value="writing">記述のみ（60分）</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>メモ（任意）</label>
+    <textarea id="setup-memo" placeholder="メモを入力..."></textarea>
+  </div>
+  <div id="setup-preview" class="card" style="max-height:300px;overflow-y:auto"></div>
+  <button class="btn btn-primary btn-block btn-lg" style="margin-top:16px" onclick="startSession()">
+    計測開始
+  </button>
+</div>
+
+<!-- ===== TIMER ===== -->
+<div id="screen-timer" class="screen">
+  <div class="timer-fullscreen">
+    <div class="timer-display" id="timer-display">
+      <div class="timer-total" id="timer-total">0:00:00</div>
+      <div class="timer-middle">
+        <div class="timer-step-info">
+          <div class="timer-step-name" id="timer-step-name"></div>
+          <div class="timer-step-time" id="timer-step-time">0:00</div>
+          <div class="timer-target" id="timer-target"></div>
+        </div>
+        <div class="timer-next" id="timer-next"></div>
+      </div>
+    </div>
+    <div class="timer-controls">
+      <button class="btn lap-btn btn-block" id="btn-lap" onclick="lap()">次の工程へ &#9654;<br><span class="key-hint-inline">Enter</span></button>
+    </div>
+    <div class="timer-controls" style="margin-top:8px">
+      <button class="btn btn-outline" id="btn-pause" style="flex:1" onclick="togglePause()">一時停止<br><span class="key-hint-inline">Space</span></button>
+      <button class="btn btn-danger" id="btn-finish" style="flex:1" onclick="finishSession()">終了</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== REVIEW ===== -->
+<div id="screen-review" class="screen">
+  <div class="header">
+    <h1>振り返り</h1>
+  </div>
+  <div id="review-summary" class="card" style="text-align:center;margin-bottom:16px"></div>
+  <div id="review-steps"></div>
+  <div class="form-group" style="margin-top:16px">
+    <label>セッション全体メモ</label>
+    <textarea id="review-memo" placeholder="全体の振り返りメモ..."></textarea>
+  </div>
+  <button class="btn btn-primary btn-block btn-lg" onclick="saveSession()">保存する</button>
+  <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="discardSession()">保存せず終了</button>
+</div>
+
+<!-- ===== HISTORY ===== -->
+<div id="screen-history" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">&larr;</button>
+    <h1>履歴</h1>
+  </div>
+  <div class="filter-bar">
+    <select id="history-mode-filter" onchange="renderHistory()">
+      <option value="">全モード</option>
+      <option value="full">フル</option>
+      <option value="esquisse">エスキス</option>
+      <option value="drawing">作図</option>
+      <option value="writing">記述</option>
+    </select>
+  </div>
+  <div id="history-list"></div>
+</div>
+
+<!-- ===== SESSION DETAIL ===== -->
+<div id="screen-detail" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('history')">&larr;</button>
+    <h1>セッション詳細</h1>
+  </div>
+  <div id="detail-content"></div>
+</div>
+
+<!-- ===== ANALYSIS ===== -->
+<div id="screen-analysis" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">&larr;</button>
+    <h1>分析</h1>
+  </div>
+  <div class="filter-bar">
+    <select id="analysis-mode-filter" onchange="renderAnalysis()">
+      <option value="">全モード</option>
+      <option value="full">フル</option>
+      <option value="esquisse">エスキス</option>
+      <option value="drawing">作図</option>
+      <option value="writing">記述</option>
+    </select>
+    <select id="analysis-task-filter" onchange="renderAnalysis()">
+      <option value="">全課題</option>
+    </select>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchAnalysisTab('progress',this)">成長推移</button>
+    <button class="tab-btn" onclick="switchAnalysisTab('breakdown',this)">工程内訳</button>
+    <button class="tab-btn" onclick="switchAnalysisTab('compare',this)">工程比較</button>
+    <button class="tab-btn" onclick="switchAnalysisTab('rating',this)">評価分析</button>
+  </div>
+  <div id="analysis-progress" class="chart-container"><canvas id="chart-progress"></canvas></div>
+  <div id="analysis-breakdown" class="chart-container" style="display:none"><canvas id="chart-breakdown"></canvas></div>
+  <div id="analysis-compare" style="display:none"><div id="compare-content"></div></div>
+  <div id="analysis-rating" style="display:none"><div id="rating-content"></div></div>
+</div>
+
+<!-- ===== SETTINGS ===== -->
+<div id="screen-settings" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">&larr;</button>
+    <h1>設定</h1>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchSettingsTab('steps',this)">工程カスタマイズ</button>
+    <button class="tab-btn" onclick="switchSettingsTab('theme',this)">テーマカラー</button>
+    <button class="tab-btn" onclick="switchSettingsTab('data',this)">データ管理</button>
+  </div>
+  <div id="settings-steps">
+    <div class="form-group">
+      <label>モード選択</label>
+      <select id="settings-mode" onchange="renderStepEditor()">
+        <option value="full">フルモード</option>
+        <option value="esquisse">エスキスのみ</option>
+        <option value="drawing">作図のみ</option>
+        <option value="writing">記述のみ</option>
+      </select>
+    </div>
+    <div id="step-editor-list"></div>
+    <div id="step-editor-total" style="text-align:right;font-size:0.9rem;margin-top:8px;font-weight:600;display:none"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="addStep()">＋ 工程追加</button>
+      <button class="btn btn-outline btn-sm" onclick="resetStepsToDefault()">デフォルトに戻す</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSteps()">保存</button>
+    </div>
+  </div>
+  <div id="settings-theme" style="display:none">
+    <h3 style="margin-bottom:12px">アクセントカラー</h3>
+    <div class="color-presets" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px" id="color-presets"></div>
+    <div class="form-group">
+      <label>カスタムカラー</label>
+      <div style="display:flex;gap:12px;align-items:center">
+        <input type="color" id="custom-color-picker" style="width:60px;height:40px;padding:2px;border-radius:8px;border:1px solid var(--border);background:var(--bg-input);cursor:pointer" onchange="applyThemeColor(this.value)">
+        <span id="custom-color-hex" style="font-variant-numeric:tabular-nums;color:var(--text-dim)"></span>
+      </div>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="resetThemeColor()">デフォルトに戻す</button>
+  </div>
+  <div id="settings-data" style="display:none">
+    <h3 style="margin-bottom:12px">バックアップ（JSON）</h3>
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="btn btn-outline" onclick="exportJSON()">エクスポート</button>
+      <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">インポート</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importJSON(event)">
+    </div>
+    <h3 style="margin-bottom:12px">分析用エクスポート（CSV）</h3>
+    <div style="margin-bottom:20px">
+      <button class="btn btn-outline" onclick="exportCSV()">CSVダウンロード</button>
+      <p style="color:var(--text-dim);font-size:0.8rem;margin-top:6px">Googleスプレッドシートで直接開けます</p>
+    </div>
+    <h3 style="margin-bottom:12px;color:var(--bad)">データリセット</h3>
+    <button class="btn btn-danger" onclick="confirmResetAll()">全データを削除</button>
+  </div>
+</div>
+
+<!-- Best Time Overlay -->
+<div class="best-time-overlay" id="best-time-overlay" onclick="closeBestTime()">
+  <div class="best-time-content">
+    <div class="trophy">&#127942;</div>
+    <div class="message" id="best-time-message">ベストタイム更新!</div>
+    <div class="detail" id="best-time-detail"></div>
+    <p style="color:var(--text-dim);font-size:0.8rem;margin-top:20px">タップして閉じる</p>
+  </div>
+</div>
+
+<script>
+// ========================================
+// 1. Constants & Default Templates
+// ========================================
+const STORAGE_KEYS = {
+  sessions: 'seizu_sessions',
+  templates: 'seizu_templates',
+  stats: 'seizu_stats'
+};
+
+const DEFAULT_TEMPLATES = {
+  full: [
+    { name: '問題文読み取り', targetTime: 1800 },
+    { name: 'ラフプラン', targetTime: 2700 },
+    { name: '1/400エスキス前チェック', targetTime: 300 },
+    { name: '1/400エスキス', targetTime: 3600 },
+    { name: '中間チェック', targetTime: 600 },
+    { name: '記述（計画の要点等）', targetTime: 3600 },
+    { name: '面積表', targetTime: 240 },
+    { name: '通り心・寸法線（各階同時）', targetTime: 360 },
+    { name: '柱の図示（各階同時）', targetTime: 300 },
+    { name: '外壁の下書き・開口部位置（各階同時）', targetTime: 540 },
+    { name: '外壁仕上げ 太線（各階同時）', targetTime: 720 },
+    { name: '内壁の下書き（各階同時）', targetTime: 540 },
+    { name: '内壁の出入口位置（各階同時）', targetTime: 720 },
+    { name: '内壁仕上げ 太線（各階同時）', targetTime: 1080 },
+    { name: '階段・EV・便所・PS・DS・EPS（各階同時）', targetTime: 600 },
+    { name: '室名・什器・断面図切断線（各階同時）', targetTime: 2100 },
+    { name: '外構（各階同時）', targetTime: 600 },
+    { name: '法的な記入項目（各階同時）', targetTime: 600 },
+    { name: '境界線・通り心・横寸法（断面図）', targetTime: 180 },
+    { name: '床高・縦寸法・スラブ厚等（断面図）', targetTime: 300 },
+    { name: '梁幅・梁せいの下書き（断面図）', targetTime: 240 },
+    { name: '開口部・間仕切壁の下書き（断面図）', targetTime: 180 },
+    { name: '断面の仕上げ 太線（断面図）', targetTime: 600 },
+    { name: '天井高・室名・屋上設備等（断面図）', targetTime: 300 },
+    { name: '補足事項・タイル目地・植栽等', targetTime: 600 }
+  ],
+  esquisse: [
+    { name: '問題文読み取り', targetTime: 1800 },
+    { name: 'ラフプラン', targetTime: 2700 },
+    { name: '1/400エスキス前チェック', targetTime: 300 },
+    { name: '1/400エスキス', targetTime: 3600 },
+    { name: '中間チェック', targetTime: 600 }
+  ],
+  drawing: [
+    { name: '面積表', targetTime: 240 },
+    { name: '通り心・寸法線（各階同時）', targetTime: 360 },
+    { name: '柱の図示（各階同時）', targetTime: 300 },
+    { name: '外壁の下書き・開口部位置（各階同時）', targetTime: 540 },
+    { name: '外壁仕上げ 太線（各階同時）', targetTime: 720 },
+    { name: '内壁の下書き（各階同時）', targetTime: 540 },
+    { name: '内壁の出入口位置（各階同時）', targetTime: 720 },
+    { name: '内壁仕上げ 太線（各階同時）', targetTime: 1080 },
+    { name: '階段・EV・便所・PS・DS・EPS（各階同時）', targetTime: 600 },
+    { name: '室名・什器・断面図切断線（各階同時）', targetTime: 2100 },
+    { name: '外構（各階同時）', targetTime: 600 },
+    { name: '法的な記入項目（各階同時）', targetTime: 600 },
+    { name: '境界線・通り心・横寸法（断面図）', targetTime: 180 },
+    { name: '床高・縦寸法・スラブ厚等（断面図）', targetTime: 300 },
+    { name: '梁幅・梁せいの下書き（断面図）', targetTime: 240 },
+    { name: '開口部・間仕切壁の下書き（断面図）', targetTime: 180 },
+    { name: '断面の仕上げ 太線（断面図）', targetTime: 600 },
+    { name: '天井高・室名・屋上設備等（断面図）', targetTime: 300 },
+    { name: '補足事項・タイル目地・植栽等', targetTime: 600 }
+  ],
+  writing: [
+    { name: '記述（計画の要点等）', targetTime: 3600 }
+  ]
+};
+
+const MODE_LABELS = { full: 'フル', esquisse: 'エスキス', drawing: '作図', writing: '記述' };
+
+// ========================================
+// 2. Storage Layer
+// ========================================
+function getSessions() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.sessions)) || []; }
+  catch { return []; }
+}
+function saveSessions(sessions) {
+  localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(sessions));
+}
+function getTemplates() {
+  try {
+    const t = JSON.parse(localStorage.getItem(STORAGE_KEYS.templates));
+    if (t && t.full && t.esquisse && t.drawing) return t;
+  } catch {}
+  return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
+}
+function saveTemplates(templates) {
+  localStorage.setItem(STORAGE_KEYS.templates, JSON.stringify(templates));
+}
+function getStats() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.stats)) || { totalSessions: 0, bestTimes: {} }; }
+  catch { return { totalSessions: 0, bestTimes: {} }; }
+}
+function saveStats(stats) {
+  localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(stats));
+}
+
+// ========================================
+// 3. Navigation
+// ========================================
+let currentScreen = 'home';
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  currentScreen = id;
+  window.scrollTo(0, 0);
+  if (id === 'home') renderHome();
+  if (id === 'history') renderHistory();
+  if (id === 'analysis') renderAnalysis();
+  if (id === 'settings') renderStepEditor();
+  if (id === 'setup') updateSetupPreview();
+}
+
+// ========================================
+// 4. Timer State & Logic
+// ========================================
+let timerState = {
+  running: false,
+  paused: false,
+  mode: 'full',
+  taskName: '',
+  memo: '',
+  steps: [],
+  currentStep: 0,
+  totalElapsed: 0,
+  stepElapsed: 0,
+  intervalId: null,
+  laps: []
+};
+
+function startSession() {
+  const taskName = document.getElementById('setup-task').value.trim();
+  const mode = document.getElementById('setup-mode').value;
+  const memo = document.getElementById('setup-memo').value.trim();
+  if (!taskName) { alert('課題名を入力してください'); return; }
+  const templates = getTemplates();
+  timerState = {
+    running: true, paused: false, mode, taskName, memo,
+    steps: JSON.parse(JSON.stringify(templates[mode])),
+    currentStep: 0, totalElapsed: 0, stepElapsed: 0,
+    intervalId: null, laps: []
+  };
+  showScreen('timer');
+  renderTimerUI();
+  timerState.intervalId = setInterval(timerTick, 100);
+}
+
+let lastTickTime = 0;
+function timerTick() {
+  if (!timerState.running || timerState.paused) return;
+  const now = performance.now();
+  if (lastTickTime === 0) { lastTickTime = now; return; }
+  const delta = (now - lastTickTime) / 1000;
+  lastTickTime = now;
+  timerState.totalElapsed += delta;
+  timerState.stepElapsed += delta;
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const el = (id) => document.getElementById(id);
+  el('timer-total').textContent = formatTime(timerState.totalElapsed);
+  const step = timerState.steps[timerState.currentStep];
+  if (!step) return;
+  el('timer-step-name').textContent = step.name;
+  el('timer-step-time').textContent = formatTimeMM(timerState.stepElapsed);
+  const isOver = timerState.stepElapsed > step.targetTime;
+  el('timer-step-time').className = 'timer-step-time' + (isOver ? ' over' : '');
+  el('timer-target').textContent = '目標: ' + formatTimeMM(step.targetTime);
+  const next = timerState.steps[timerState.currentStep + 1];
+  if (next) {
+    el('timer-next').textContent = '次は ' + next.name;
+  } else {
+    el('timer-next').textContent = '最終工程';
+  }
+}
+
+function renderTimerUI() {
+  lastTickTime = 0;
+  const display = document.getElementById('timer-display');
+  display.classList.remove('timer-paused');
+  document.getElementById('btn-pause').innerHTML = '一時停止<br><span class="key-hint-inline">Space</span>';
+  const lapLabel = timerState.currentStep < timerState.steps.length - 1 ? '次の工程へ \u25B6' : '完了 \u2713';
+  document.getElementById('btn-lap').innerHTML = lapLabel + '<br><span class="key-hint-inline">Enter</span>';
+  updateTimerDisplay();
+}
+
+function renderStepListMini() {
+  const el = document.getElementById('timer-step-list');
+  let html = '';
+  timerState.steps.forEach((s, i) => {
+    const cls = i < timerState.currentStep ? 'done' : (i === timerState.currentStep ? 'current' : '');
+    const actual = i < timerState.laps.length ? formatTimeMM(timerState.laps[i].actualTime) :
+                   (i === timerState.currentStep ? formatTimeMM(timerState.stepElapsed) : '--:--');
+    html += '<div class="step-item ' + cls + '">' +
+      '<span>' + escapeText((i+1) + '. ' + s.name) + '</span>' +
+      '<span class="step-actual">' + actual + '</span></div>';
+  });
+  el.innerHTML = html;
+}
+
+function lap() {
+  if (!timerState.running) return;
+  const step = timerState.steps[timerState.currentStep];
+  timerState.laps.push({
+    name: step.name,
+    targetTime: step.targetTime,
+    actualTime: timerState.stepElapsed,
+    rating: null,
+    memo: ''
+  });
+  timerState.stepElapsed = 0;
+  if (timerState.currentStep < timerState.steps.length - 1) {
+    timerState.currentStep++;
+    renderTimerUI();
+  } else {
+    finishSession();
+  }
+}
+
+function togglePause() {
+  if (!timerState.running) return;
+  timerState.paused = !timerState.paused;
+  const display = document.getElementById('timer-display');
+  if (timerState.paused) {
+    display.classList.add('timer-paused');
+    document.getElementById('btn-pause').innerHTML = '再開<br><span class="key-hint-inline">Space</span>';
+    lastTickTime = 0;
+  } else {
+    display.classList.remove('timer-paused');
+    document.getElementById('btn-pause').innerHTML = '一時停止<br><span class="key-hint-inline">Space</span>';
+    lastTickTime = 0;
+  }
+}
+
+function finishSession() {
+  timerState.running = false;
+  if (timerState.intervalId) clearInterval(timerState.intervalId);
+  if (timerState.currentStep < timerState.steps.length &&
+      timerState.laps.length <= timerState.currentStep) {
+    const step = timerState.steps[timerState.currentStep];
+    timerState.laps.push({
+      name: step.name, targetTime: step.targetTime,
+      actualTime: timerState.stepElapsed, rating: null, memo: ''
+    });
+  }
+  showScreen('review');
+  renderReview();
+}
+
+// ========================================
+// 5. Review Screen
+// ========================================
+function renderReview() {
+  const summary = document.getElementById('review-summary');
+  summary.innerHTML = '';
+  const totalEl = document.createElement('div');
+  totalEl.style.cssText = 'font-size:2.5rem;font-weight:700;font-variant-numeric:tabular-nums';
+  totalEl.textContent = formatTime(timerState.totalElapsed);
+  summary.appendChild(totalEl);
+  const infoEl = document.createElement('div');
+  infoEl.style.cssText = 'color:var(--text-dim);margin-top:4px';
+  infoEl.textContent = timerState.taskName + ' / ' + MODE_LABELS[timerState.mode];
+  summary.appendChild(infoEl);
+
+  const sessions = getSessions().filter(s => s.mode === timerState.mode);
+  const avgMap = {};
+  sessions.forEach(s => {
+    s.steps.forEach(st => {
+      if (!avgMap[st.name]) avgMap[st.name] = { total: 0, count: 0 };
+      avgMap[st.name].total += st.actualTime;
+      avgMap[st.name].count++;
+    });
+  });
+
+  const container = document.getElementById('review-steps');
+  container.innerHTML = '';
+  timerState.laps.forEach((lap, i) => {
+    const avg = avgMap[lap.name];
+    const avgTime = avg ? avg.total / avg.count : null;
+    const isOver = lap.actualTime > lap.targetTime;
+    const autoRating = isOver ? 'bad' : 'good';
+    lap.rating = lap.rating || autoRating;
+    const div = document.createElement('div');
+    div.className = 'review-step';
+    div.innerHTML =
+      '<div class="review-step-header">' +
+        '<span class="review-step-name">' + escapeText((i+1) + '. ' + lap.name) + '</span>' +
+      '</div>' +
+      '<div class="review-times">' +
+        '<span><span class="time-value actual ' + (isOver ? 'over' : 'under') + '">' +
+          formatTimeMM(lap.actualTime) + '</span><span class="time-label">今回</span></span>' +
+        '<span><span class="time-value">' + formatTimeMM(lap.targetTime) +
+          '</span><span class="time-label">目標</span></span>' +
+        '<span><span class="time-value">' + (avgTime !== null ? formatTimeMM(avgTime) : '\u2015') +
+          '</span><span class="time-label">平均</span></span>' +
+      '</div>' +
+      '<div class="review-rating">' +
+        '<button class="rating-btn' + (lap.rating === 'good' ? ' selected-good' : '') + '" data-idx="'+i+'" data-val="good" onclick="setRating('+i+',\'good\',this)">&#128077; Good</button>' +
+        '<button class="rating-btn' + (lap.rating === 'bad' ? ' selected-bad' : '') + '" data-idx="'+i+'" data-val="bad" onclick="setRating('+i+',\'bad\',this)">&#128078; Bad</button>' +
+      '</div>' +
+      '<div class="review-memo"><input type="text" data-memo-idx="'+i+'" placeholder="メモ..." oninput="setLapMemo('+i+',this.value)"></div>';
+    container.appendChild(div);
+  });
+  document.getElementById('review-memo').value = timerState.memo || '';
+}
+
+function setRating(idx, val, btn) {
+  const current = timerState.laps[idx].rating;
+  timerState.laps[idx].rating = (current === val) ? null : val;
+  const btns = btn.parentElement.querySelectorAll('.rating-btn');
+  btns.forEach(b => b.className = 'rating-btn');
+  if (timerState.laps[idx].rating === 'good') {
+    btn.parentElement.querySelector('[data-val="good"]').classList.add('selected-good');
+  } else if (timerState.laps[idx].rating === 'bad') {
+    btn.parentElement.querySelector('[data-val="bad"]').classList.add('selected-bad');
+  }
+}
+
+function setLapMemo(idx, val) {
+  timerState.laps[idx].memo = val;
+}
+
+function saveSession() {
+  const session = {
+    id: Date.now().toString(),
+    date: new Date().toISOString(),
+    taskName: timerState.taskName,
+    mode: timerState.mode,
+    memo: document.getElementById('review-memo').value.trim(),
+    totalTime: timerState.totalElapsed,
+    steps: timerState.laps.map(l => ({
+      name: l.name,
+      targetTime: l.targetTime,
+      actualTime: l.actualTime,
+      rating: l.rating,
+      memo: l.memo
+    }))
+  };
+  const sessions = getSessions();
+  sessions.push(session);
+  saveSessions(sessions);
+
+  const stats = getStats();
+  stats.totalSessions = (stats.totalSessions || 0) + 1;
+  if (!stats.bestTimes) stats.bestTimes = {};
+  if (!stats.bestTimes[session.mode]) stats.bestTimes[session.mode] = { total: Infinity, steps: {} };
+  const bt = stats.bestTimes[session.mode];
+  let isBest = false;
+  if (session.totalTime < bt.total) {
+    bt.total = session.totalTime;
+    isBest = true;
+  }
+  session.steps.forEach(s => {
+    if (!bt.steps[s.name] || s.actualTime < bt.steps[s.name]) {
+      bt.steps[s.name] = s.actualTime;
+    }
+  });
+  saveStats(stats);
+
+  if (isBest && stats.totalSessions > 1) {
+    showBestTime(session.totalTime, session.mode);
+  }
+  document.getElementById('setup-task').value = '';
+  document.getElementById('setup-memo').value = '';
+  showScreen('home');
+}
+
+function discardSession() {
+  if (confirm('保存せずに終了しますか？')) showScreen('home');
+}
+
+// ========================================
+// 6. Home Screen
+// ========================================
+function renderHome() {
+  const sessions = getSessions();
+  const stats = getStats();
+  const best = stats.bestTimes || {};
+  const statsEl = document.getElementById('home-stats');
+  const counts = { full: 0, esquisse: 0, drawing: 0, writing: 0 };
+  sessions.forEach(s => { if (counts.hasOwnProperty(s.mode)) counts[s.mode]++; });
+
+  const modes = ['esquisse', 'writing', 'drawing', 'full'];
+  const modeLabels = { full: 'フル', esquisse: 'エスキス', drawing: '作図', writing: '記述' };
+  const lastByMode = {};
+  sessions.forEach(s => { lastByMode[s.mode] = s; });
+  statsEl.innerHTML = modes.map(m => {
+    const bt = best[m] && best[m].total < Infinity ? formatTime(best[m].total) : '--:--:--';
+    const last = lastByMode[m] ? formatTime(lastByMode[m].totalTime) : '--:--:--';
+    return '<div class="home-stat">' +
+      '<div class="value">' + counts[m] + '</div>' +
+      '<div class="label">' + modeLabels[m] + '</div>' +
+      '<div class="best-time">Best ' + bt + '<br>前回 ' + last + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ========================================
+// 7. History
+// ========================================
+function renderHistory() {
+  const sessions = getSessions();
+  const filter = document.getElementById('history-mode-filter').value;
+  const filtered = filter ? sessions.filter(s => s.mode === filter) : sessions;
+  const el = document.getElementById('history-list');
+  if (filtered.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">&#128203;</div><p>該当する履歴がありません</p></div>';
+    return;
+  }
+  el.innerHTML = '';
+  [...filtered].reverse().forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'history-card';
+    card.onclick = () => showSessionDetail(s.id);
+    card.innerHTML =
+      '<div class="history-card-header">' +
+        '<div><div class="task-name">' + escapeText(s.taskName) + '</div>' +
+        '<div class="date">' + formatDate(s.date) + '</div>' +
+        '<span class="mode-badge">' + MODE_LABELS[s.mode] + '</span></div>' +
+        '<div class="total-time">' + formatTime(s.totalTime) + '</div>' +
+      '</div>';
+    el.appendChild(card);
+  });
+}
+
+function showSessionDetail(id) {
+  const sessions = getSessions();
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+  const el = document.getElementById('detail-content');
+  let html = '<div class="card" style="text-align:center;margin-bottom:16px">' +
+    '<div style="font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums">' + formatTime(s.totalTime) + '</div>' +
+    '<div style="color:var(--text-dim)">' + escapeText(s.taskName) + ' / ' + MODE_LABELS[s.mode] + '</div>' +
+    '<div style="color:var(--text-dim);font-size:0.8rem">' + formatDate(s.date) + '</div>' +
+    (s.memo ? '<div style="margin-top:8px;font-size:0.9rem">' + escapeText(s.memo) + '</div>' : '') +
+    '</div>';
+
+  html += '<div style="margin-bottom:16px">';
+  s.steps.forEach((st, i) => {
+    const isOver = st.actualTime > st.targetTime;
+    const ratingIcon = st.rating === 'good' ? ' &#128077;' : (st.rating === 'bad' ? ' &#128078;' : '');
+    html += '<div class="history-detail-step">' +
+      '<span>' + escapeText((i+1) + '. ' + st.name) + ratingIcon + '</span>' +
+      '<span style="font-variant-numeric:tabular-nums;' + (isOver?'color:var(--bad)':'') + '">' +
+        formatTimeMM(st.actualTime) + ' / ' + formatTimeMM(st.targetTime) + '</span>' +
+    '</div>';
+    if (st.memo) {
+      html += '<div style="font-size:0.8rem;color:var(--text-dim);padding-left:16px;margin-bottom:4px">' +
+        escapeText(st.memo) + '</div>';
+    }
+  });
+  html += '</div>';
+  html += '<button class="btn btn-danger btn-sm" onclick="deleteSession(\'' + s.id + '\')">このセッションを削除</button>';
+  el.innerHTML = html;
+  showScreen('detail');
+}
+
+function deleteSession(id) {
+  if (!confirm('このセッションを削除しますか？')) return;
+  const sessions = getSessions().filter(s => s.id !== id);
+  saveSessions(sessions);
+  const stats = getStats();
+  stats.totalSessions = Math.max(0, (stats.totalSessions || 0) - 1);
+  saveStats(stats);
+  showScreen('history');
+}
+
+// ========================================
+// 8. Analysis
+// ========================================
+let chartProgress = null, chartBreakdown = null;
+
+function renderAnalysis() {
+  const sessions = getSessions();
+  const modeFilter = document.getElementById('analysis-mode-filter').value;
+  const taskSelect = document.getElementById('analysis-task-filter');
+  const tasks = [...new Set(sessions.map(s => s.taskName))];
+  const currentTaskVal = taskSelect.value;
+  taskSelect.innerHTML = '<option value="">全課題</option>';
+  tasks.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    if (t === currentTaskVal) opt.selected = true;
+    taskSelect.appendChild(opt);
+  });
+  const taskFilter = taskSelect.value;
+  let filtered = sessions;
+  if (modeFilter) filtered = filtered.filter(s => s.mode === modeFilter);
+  if (taskFilter) filtered = filtered.filter(s => s.taskName === taskFilter);
+
+  renderProgressChart(filtered);
+  renderBreakdownChart(filtered);
+  renderCompare(filtered);
+  renderRatingAnalysis(filtered);
+}
+
+function renderProgressChart(sessions) {
+  const ctx = document.getElementById('chart-progress');
+  if (chartProgress) chartProgress.destroy();
+  if (sessions.length === 0) { ctx.parentElement.innerHTML = '<canvas id="chart-progress"></canvas><div class="empty-state">データなし</div>'; return; }
+  chartProgress = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sessions.map((s,i) => formatDateShort(s.date)),
+      datasets: [{
+        label: '合計時間(分)',
+        data: sessions.map(s => Math.round(s.totalTime / 60)),
+        backgroundColor: 'rgba(74,158,255,0.6)',
+        borderColor: 'rgba(74,158,255,1)',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { color: '#8b8d98' }, grid: { color: '#2a2d3a' } },
+        x: { ticks: { color: '#8b8d98', maxRotation: 45 }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderBreakdownChart(sessions) {
+  const ctx = document.getElementById('chart-breakdown');
+  if (chartBreakdown) chartBreakdown.destroy();
+  if (sessions.length === 0) return;
+  const allStepNames = sessions.length > 0 ? sessions[sessions.length-1].steps.map(s => s.name) : [];
+  const colors = generateColors(allStepNames.length);
+  const datasets = allStepNames.map((name, i) => ({
+    label: name,
+    data: sessions.map(s => {
+      const st = s.steps.find(x => x.name === name);
+      return st ? Math.round(st.actualTime / 60) : 0;
+    }),
+    backgroundColor: colors[i]
+  }));
+  chartBreakdown = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: sessions.map((s,i) => formatDateShort(s.date)), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#8b8d98' }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#8b8d98' }, grid: { color: '#2a2d3a' } }
+      }
+    }
+  });
+}
+
+function renderCompare(sessions) {
+  const el = document.getElementById('compare-content');
+  if (sessions.length === 0) { el.innerHTML = '<div class="empty-state">データなし</div>'; return; }
+  const stepMap = {};
+  sessions.forEach(s => {
+    s.steps.forEach(st => {
+      if (!stepMap[st.name]) stepMap[st.name] = [];
+      stepMap[st.name].push(st.actualTime);
+    });
+  });
+  let html = '';
+  Object.entries(stepMap).forEach(([name, times]) => {
+    const avg = times.reduce((a,b)=>a+b,0)/times.length;
+    const min = Math.min(...times);
+    const max = Math.max(...times);
+    html += '<div class="card" style="margin-bottom:8px">' +
+      '<div style="font-weight:600;font-size:0.9rem;margin-bottom:6px">' + escapeText(name) + '</div>' +
+      '<div style="display:flex;gap:16px;font-size:0.85rem">' +
+        '<span>平均 <strong>' + formatTimeMM(avg) + '</strong></span>' +
+        '<span style="color:var(--good)">最速 <strong>' + formatTimeMM(min) + '</strong></span>' +
+        '<span style="color:var(--bad)">最遅 <strong>' + formatTimeMM(max) + '</strong></span>' +
+      '</div></div>';
+  });
+  el.innerHTML = html;
+}
+
+function renderRatingAnalysis(sessions) {
+  const el = document.getElementById('rating-content');
+  if (sessions.length === 0) { el.innerHTML = '<div class="empty-state">データなし</div>'; return; }
+  const stepMap = {};
+  sessions.forEach(s => {
+    s.steps.forEach(st => {
+      if (!stepMap[st.name]) stepMap[st.name] = { good: 0, bad: 0, total: 0 };
+      if (st.rating === 'good') { stepMap[st.name].good++; stepMap[st.name].total++; }
+      else if (st.rating === 'bad') { stepMap[st.name].bad++; stepMap[st.name].total++; }
+    });
+  });
+  let html = '';
+  Object.entries(stepMap).forEach(([name, data]) => {
+    if (data.total === 0) return;
+    const goodRate = Math.round((data.good / data.total) * 100);
+    const isBadHeavy = data.bad > data.good;
+    html += '<div class="card" style="margin-bottom:8px;' + (isBadHeavy?'border-left:3px solid var(--bad)':'') + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="font-weight:600;font-size:0.9rem">' + escapeText(name) + '</span>' +
+        '<span>Good率 <strong style="color:' + (goodRate >= 50 ? 'var(--good)' : 'var(--bad)') + '">' + goodRate + '%</strong></span>' +
+      '</div>' +
+      '<div style="font-size:0.8rem;color:var(--text-dim);margin-top:4px">' +
+        '&#128077; ' + data.good + '  &#128078; ' + data.bad +
+      '</div></div>';
+  });
+  if (!html) html = '<div class="empty-state">まだ評価データがありません</div>';
+  el.innerHTML = html;
+}
+
+function switchAnalysisTab(tab, btn) {
+  ['progress','breakdown','compare','rating'].forEach(t => {
+    const el = document.getElementById('analysis-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  btn.parentElement.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ========================================
+// 9. Settings
+// ========================================
+let editingSteps = [];
+function renderStepEditor() {
+  const mode = document.getElementById('settings-mode').value;
+  const templates = getTemplates();
+  editingSteps = JSON.parse(JSON.stringify(templates[mode]));
+  renderStepEditorList();
+}
+
+function renderStepEditorList() {
+  const el = document.getElementById('step-editor-list');
+  el.innerHTML = '';
+  editingSteps.forEach((step, i) => {
+    const div = document.createElement('div');
+    div.className = 'step-editor-item';
+    div.draggable = true;
+    div.dataset.idx = i;
+    div.innerHTML =
+      '<span class="drag-handle">&#9776;</span>' +
+      '<input type="text" value="' + escapeAttr(step.name) + '" ' +
+        'oninput="editingSteps['+i+'].name=this.value">' +
+      '<input type="number" value="' + Math.round(step.targetTime/60) + '" min="1" ' +
+        'oninput="editingSteps['+i+'].targetTime=parseInt(this.value||1)*60;updateStepTotal()" title="分">' +
+      '<span style="color:var(--text-dim);font-size:0.8rem">分</span>' +
+      '<button class="remove-btn" onclick="removeStep('+i+')">&times;</button>';
+    setupDrag(div, i);
+    el.appendChild(div);
+  });
+  updateStepTotal();
+}
+
+function updateStepTotal() {
+  const mode = document.getElementById('settings-mode').value;
+  const totalEl = document.getElementById('step-editor-total');
+  const totalMin = editingSteps.reduce((sum, s) => sum + Math.round(s.targetTime / 60), 0);
+  totalEl.style.display = '';
+  totalEl.textContent = '合計: ' + totalMin + '分';
+  totalEl.style.color = (mode === 'full' && totalMin !== 390) ? 'var(--bad)' : 'var(--text)';
+}
+
+function setupDrag(el, idx) {
+  el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', idx); });
+  el.addEventListener('dragover', e => { e.preventDefault(); el.style.borderTop='2px solid var(--accent)'; });
+  el.addEventListener('dragleave', e => { el.style.borderTop=''; });
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.style.borderTop='';
+    const from = parseInt(e.dataTransfer.getData('text/plain'));
+    const to = idx;
+    if (from === to) return;
+    const item = editingSteps.splice(from, 1)[0];
+    editingSteps.splice(to, 0, item);
+    renderStepEditorList();
+  });
+}
+
+function addStep() {
+  editingSteps.push({ name: '新規工程', targetTime: 600 });
+  renderStepEditorList();
+}
+
+function removeStep(idx) {
+  editingSteps.splice(idx, 1);
+  renderStepEditorList();
+}
+
+function saveSteps() {
+  const mode = document.getElementById('settings-mode').value;
+  if (mode === 'full') {
+    const totalMin = editingSteps.reduce((sum, s) => sum + Math.round(s.targetTime / 60), 0);
+    if (totalMin !== 390) {
+      if (!confirm('合計が' + totalMin + '分です（目標: 390分）。このまま保存しますか？')) return;
+    }
+  }
+  const templates = getTemplates();
+  templates[mode] = editingSteps;
+  saveTemplates(templates);
+  alert('保存しました');
+}
+
+function resetStepsToDefault() {
+  if (!confirm('デフォルトの工程に戻しますか？')) return;
+  const mode = document.getElementById('settings-mode').value;
+  editingSteps = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES[mode]));
+  renderStepEditorList();
+}
+
+function switchSettingsTab(tab, btn) {
+  document.getElementById('settings-steps').style.display = tab === 'steps' ? '' : 'none';
+  document.getElementById('settings-theme').style.display = tab === 'theme' ? '' : 'none';
+  document.getElementById('settings-data').style.display = tab === 'data' ? '' : 'none';
+  if (tab === 'theme') renderThemeSettings();
+  btn.parentElement.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ========================================
+// 9.5 Theme Color
+// ========================================
+const COLOR_PRESETS = [
+  { name: 'ブルー', color: '#4a9eff' },
+  { name: 'グリーン', color: '#34d399' },
+  { name: 'パープル', color: '#a78bfa' },
+  { name: 'ピンク', color: '#f472b6' },
+  { name: 'オレンジ', color: '#fb923c' },
+  { name: 'レッド', color: '#f87171' },
+  { name: 'イエロー', color: '#fbbf24' },
+  { name: 'ティール', color: '#2dd4bf' }
+];
+
+function renderThemeSettings() {
+  const el = document.getElementById('color-presets');
+  const current = getThemeColor();
+  el.innerHTML = '';
+  COLOR_PRESETS.forEach(p => {
+    const btn = document.createElement('div');
+    btn.style.cssText = 'width:44px;height:44px;border-radius:50%;background:' + p.color +
+      ';cursor:pointer;border:3px solid ' + (current === p.color ? '#fff' : 'transparent') +
+      ';transition:all 0.15s;display:flex;align-items:center;justify-content:center';
+    btn.title = p.name;
+    if (current === p.color) btn.innerHTML = '<span style="color:#fff;font-weight:bold">&#10003;</span>';
+    btn.onclick = () => applyThemeColor(p.color);
+    el.appendChild(btn);
+  });
+  document.getElementById('custom-color-picker').value = current;
+  document.getElementById('custom-color-hex').textContent = current;
+}
+
+function getThemeColor() {
+  return localStorage.getItem('seizu_theme_color') || '#4a9eff';
+}
+
+function applyThemeColor(color) {
+  localStorage.setItem('seizu_theme_color', color);
+  document.documentElement.style.setProperty('--accent', color);
+  // accent-hoverを少し暗くする
+  document.documentElement.style.setProperty('--accent-hover', darkenColor(color, 15));
+  if (currentScreen === 'settings') renderThemeSettings();
+}
+
+function resetThemeColor() {
+  localStorage.removeItem('seizu_theme_color');
+  applyThemeColor('#4a9eff');
+}
+
+function darkenColor(hex, percent) {
+  const num = parseInt(hex.slice(1), 16);
+  const r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100));
+  const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * percent / 100));
+  const b = Math.max(0, (num & 0x0000FF) - Math.round(255 * percent / 100));
+  return '#' + (0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1);
+}
+
+function loadThemeColor() {
+  const color = getThemeColor();
+  if (color !== '#4a9eff') applyThemeColor(color);
+}
+
+// ========================================
+// 10. Data Import/Export
+// ========================================
+function exportJSON() {
+  const data = {
+    version: 1,
+    exportDate: new Date().toISOString(),
+    sessions: getSessions(),
+    templates: getTemplates(),
+    stats: getStats()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  downloadBlob(blob, 'seizu_backup_' + formatDateFile(new Date()) + '.json');
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!validateImport(data)) { alert('無効なファイル形式です'); return; }
+      if (!confirm('インポートすると現在のデータに追加されます。続行しますか？')) return;
+      const currentSessions = getSessions();
+      const existingIds = new Set(currentSessions.map(s => s.id));
+      const newSessions = (data.sessions || []).filter(s => !existingIds.has(s.id));
+      saveSessions([...currentSessions, ...newSessions]);
+      if (data.templates) saveTemplates(data.templates);
+      const stats = getStats();
+      stats.totalSessions = getSessions().length;
+      saveStats(stats);
+      alert(newSessions.length + '件のセッションをインポートしました');
+      renderHome();
+    } catch (err) {
+      alert('ファイルの読み込みに失敗しました');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function validateImport(data) {
+  if (typeof data !== 'object' || data === null) return false;
+  if (!Array.isArray(data.sessions)) return false;
+  for (const s of data.sessions) {
+    if (typeof s.id !== 'string' || typeof s.date !== 'string' ||
+        typeof s.taskName !== 'string' || typeof s.mode !== 'string' ||
+        typeof s.totalTime !== 'number' || !Array.isArray(s.steps)) return false;
+    if (!['full','esquisse','drawing'].includes(s.mode)) return false;
+    for (const st of s.steps) {
+      if (typeof st.name !== 'string' || typeof st.targetTime !== 'number' ||
+          typeof st.actualTime !== 'number') return false;
+      if (st.rating !== null && st.rating !== 'good' && st.rating !== 'bad') return false;
+    }
+  }
+  return true;
+}
+
+function exportCSV() {
+  const sessions = getSessions();
+  if (sessions.length === 0) { alert('エクスポートするデータがありません'); return; }
+  const BOM = '\uFEFF';
+  const headers = ['実施日','課題名','モード','工程番号','工程名','目標時間(分)','実績時間(分)','評価','メモ','合計時間(分)'];
+  let csv = BOM + headers.join(',') + '\n';
+  sessions.forEach(s => {
+    s.steps.forEach((st, i) => {
+      const row = [
+        formatDate(s.date),
+        csvEscape(s.taskName),
+        MODE_LABELS[s.mode],
+        i + 1,
+        csvEscape(st.name),
+        Math.round(st.targetTime / 60),
+        Math.ceil(st.actualTime / 60),
+        st.rating === 'good' ? 'Good' : (st.rating === 'bad' ? 'Bad' : ''),
+        csvEscape(st.memo || ''),
+        Math.ceil(s.totalTime / 60)
+      ];
+      csv += row.join(',') + '\n';
+    });
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, 'seizu_data_' + formatDateFile(new Date()) + '.csv');
+}
+
+function csvEscape(str) {
+  if (!str) return '""';
+  str = String(str);
+  if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function confirmResetAll() {
+  if (!confirm('本当にすべてのデータを削除しますか？\nこの操作は元に戻せません。')) return;
+  if (!confirm('最終確認：全データを完全に削除します。よろしいですか？')) return;
+  localStorage.removeItem(STORAGE_KEYS.sessions);
+  localStorage.removeItem(STORAGE_KEYS.templates);
+  localStorage.removeItem(STORAGE_KEYS.stats);
+  alert('全データを削除しました');
+  renderHome();
+}
+
+// ========================================
+// 11. Gamification
+// ========================================
+function showBestTime(time, mode) {
+  const el = document.getElementById('best-time-overlay');
+  document.getElementById('best-time-message').textContent = 'ベストタイム更新!';
+  document.getElementById('best-time-detail').textContent =
+    MODE_LABELS[mode] + 'モード: ' + formatTime(time);
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+function closeBestTime() {
+  document.getElementById('best-time-overlay').classList.remove('show');
+}
+
+// ========================================
+// 12. Utilities
+// ========================================
+function formatTime(sec) {
+  sec = Math.floor(sec);
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+function formatTimeMM(sec) {
+  sec = Math.floor(sec);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+function formatDate(iso) {
+  const d = new Date(iso);
+  return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + ' ' +
+    String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function formatDateShort(iso) {
+  const d = new Date(iso);
+  return (d.getMonth()+1) + '/' + d.getDate();
+}
+function formatDateFile(d) {
+  return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+}
+function escapeText(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function escapeAttr(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function downloadBlob(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function generateColors(n) {
+  const base = [
+    'rgba(74,158,255,0.7)','rgba(52,211,153,0.7)','rgba(248,113,113,0.7)',
+    'rgba(251,191,36,0.7)','rgba(167,139,250,0.7)','rgba(244,114,182,0.7)',
+    'rgba(34,211,238,0.7)','rgba(163,230,53,0.7)','rgba(251,146,60,0.7)',
+    'rgba(129,140,248,0.7)'
+  ];
+  const colors = [];
+  for (let i = 0; i < n; i++) colors.push(base[i % base.length]);
+  return colors;
+}
+
+// ========================================
+// 13. Setup Preview
+// ========================================
+function updateSetupPreview() {
+  const mode = document.getElementById('setup-mode').value;
+  const templates = getTemplates();
+  const steps = templates[mode];
+  const el = document.getElementById('setup-preview');
+  const total = steps.reduce((a,s) => a + s.targetTime, 0);
+  // 課題名サジェスチョン更新
+  const dl = document.getElementById('task-suggestions');
+  const names = [...new Set(getSessions().map(s => s.taskName).filter(Boolean))];
+  dl.innerHTML = names.map(n => '<option value="' + escapeAttr(n) + '">').join('');
+  let html = '<div style="font-weight:600;margin-bottom:8px">工程一覧（合計 ' + formatTimeMM(total) + '）</div>';
+  let cumulative = 0;
+  steps.forEach((s, i) => {
+    cumulative += s.targetTime;
+    html += '<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:3px 0;border-bottom:1px solid var(--border)">' +
+      '<span>' + escapeText((i+1) + '. ' + s.name) + '</span>' +
+      '<span style="font-variant-numeric:tabular-nums;color:var(--text-dim)">' +
+        formatTimeMM(s.targetTime) + ' (' + formatTimeMM(cumulative) + ')</span></div>';
+  });
+  el.innerHTML = html;
+}
+
+// ========================================
+// 14. Keyboard Shortcuts
+// ========================================
+document.addEventListener('keydown', function(e) {
+  if (currentScreen !== 'timer') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    lap();
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    togglePause();
+  }
+});
+
+// ========================================
+// Init
+// ========================================
+loadThemeColor();
+renderHome();
+</script>
+</body>
+</html>
