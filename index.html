@@ -161,11 +161,10 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 .timer-next {
   flex-shrink:0; text-align:right; line-height:1.4;
 }
-/* スマホ：横並び（次の工程を右に） */
+/* スマホ */
 @media (max-width:768px) {
-  .timer-middle { flex-direction:row; align-items:center; gap:12px; max-width:none; }
-  .timer-step-info { flex:1; min-width:0; }
-  .timer-next { white-space:nowrap; }
+  .timer-middle { max-width:none; }
+  .timer-next { text-align:center; }
 }
 /* スマホ横向き：横幅いっぱい＋全要素を縮めて1画面に収める */
 @media (max-height:500px) {
