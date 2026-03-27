@@ -748,7 +748,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   currentScreen = id;
-
+  localStorage.setItem('demo_seizu_screen', id);
   window.scrollTo(0, 0);
   if (id === 'home') renderHome();
   if (id === 'history') renderHistory();
@@ -1768,7 +1768,12 @@ function generateDemoData() {
 }
 loadThemeColor();
 generateDemoData();
-renderHome();
+const savedScreen = localStorage.getItem('demo_seizu_screen');
+if (savedScreen && savedScreen !== 'timer' && savedScreen !== 'review') {
+  showScreen(savedScreen);
+} else {
+  renderHome();
+}
 </script>
 </body>
 </html>
