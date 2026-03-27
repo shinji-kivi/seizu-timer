@@ -1740,7 +1740,8 @@ tryResumeSession();
 window.addEventListener('beforeunload', (e) => {
   if (timerState.running && !timerState.paused) {
     e.preventDefault();
-    e.returnValue = '';
+    e.returnValue = 'タイマー計測中です。ページを離れますか？';
+    return e.returnValue;
   }
 });
 </script>
