@@ -543,7 +543,12 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <button class="tab-btn" onclick="switchAnalysisTab('rating',this)">評価分析</button>
   </div>
   <div id="analysis-progress" class="chart-container"><canvas id="chart-progress"></canvas></div>
-  <div id="analysis-breakdown" class="chart-container" style="display:none"><canvas id="chart-breakdown"></canvas></div>
+  <div id="analysis-breakdown" style="display:none">
+    <div style="margin-bottom:8px">
+      <select id="breakdown-step-filter" onchange="updateBreakdownVisibility()" style="width:100%"></select>
+    </div>
+    <div class="chart-container"><canvas id="chart-breakdown"></canvas></div>
+  </div>
   <div id="analysis-compare" style="display:none"><div id="compare-content"></div></div>
   <div id="analysis-rating" style="display:none"><div id="rating-content"></div></div>
 </div>
@@ -1195,58 +1200,56 @@ function renderProgressChart(sessions) {
   });
 }
 
+let breakdownSessions = [];
 function renderBreakdownChart(sessions) {
+  breakdownSessions = sessions;
   const ctx = document.getElementById('chart-breakdown');
   if (chartBreakdown) chartBreakdown.destroy();
   if (sessions.length === 0) return;
-  const allStepNames = sessions.length > 0 ? sessions[sessions.length-1].steps.map(s => s.name) : [];
+  const allStepNames = sessions[sessions.length-1].steps.map(s => s.name);
+  const select = document.getElementById('breakdown-step-filter');
+  const prevVal = select.value;
+  select.innerHTML = '<option value="">全工程</option>';
+  allStepNames.forEach((name, i) => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = (i+1) + '. ' + name;
+    if (name === prevVal) opt.selected = true;
+    select.appendChild(opt);
+  });
+  const filterName = select.value;
+  const showNames = filterName ? [filterName] : allStepNames;
   const colors = generateColors(allStepNames.length);
-  const datasets = allStepNames.map((name, i) => ({
-    label: name,
-    data: sessions.map(s => {
-      const st = s.steps.find(x => x.name === name);
-      return st ? Math.round(st.actualTime / 60) : 0;
-    }),
-    borderColor: colors[i],
-    backgroundColor: 'transparent',
-    borderWidth: 2, pointRadius: 3, tension: 0
-  }));
+  const datasets = showNames.map(name => {
+    const idx = allStepNames.indexOf(name);
+    return {
+      label: name,
+      data: sessions.map(s => {
+        const st = s.steps.find(x => x.name === name);
+        return st ? Math.round(st.actualTime / 60) : 0;
+      }),
+      borderColor: colors[idx],
+      backgroundColor: 'transparent',
+      borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#fff', tension: 0
+    };
+  });
   chartBreakdown = new Chart(ctx, {
     type: 'line',
     data: { labels: sessions.map(s => formatDateShort(s.date)), datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: true, position: 'bottom',
-          labels: {
-            color: '#8b8d98', font: { size: 10 }, padding: 8, boxWidth: 0,
-            generateLabels: function(chart) {
-              return chart.data.datasets.map((ds, i) => {
-                const visible = chart.isDatasetVisible(i);
-                return {
-                  text: (visible ? '\u2713 ' : '\u3000') + ds.label,
-                  fillStyle: 'transparent', strokeStyle: 'transparent',
-                  fontColor: visible ? ds.borderColor : '#555',
-                  hidden: false, datasetIndex: i
-                };
-              });
-            }
-          },
-          onClick: function(e, item, legend) {
-            const idx = item.datasetIndex;
-            const chart = legend.chart;
-            chart.setDatasetVisibility(idx, !chart.isDatasetVisible(idx));
-            chart.update();
-          }
-        }
-      },
+      plugins: { legend: { display: showNames.length > 1, position: 'bottom',
+        labels: { color: '#8b8d98', font: { size: 10 }, padding: 8, boxWidth: 12 }
+      }},
       scales: {
         x: { ticks: { color: '#8b8d98', maxRotation: 45 }, grid: { display: false } },
         y: { beginAtZero: true, ticks: { color: '#8b8d98', callback: v => v + '分' }, grid: { color: '#2a2d3a' } }
       }
     }
   });
+}
+
+function updateBreakdownVisibility() {
+  renderBreakdownChart(breakdownSessions);
 }
 
 function renderCompare(sessions) {
@@ -1689,7 +1692,7 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ========================================
-// Demo Data Generator
+// Init
 // ========================================
 function generateDemoData() {
   if (getSessions().length > 0) return;
@@ -1727,10 +1730,6 @@ function generateDemoData() {
   saveSessions(sessions);
   saveStats(stats);
 }
-
-// ========================================
-// Init
-// ========================================
 loadThemeColor();
 generateDemoData();
 showScreen('analysis');
