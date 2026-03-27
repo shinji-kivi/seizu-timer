@@ -1731,7 +1731,7 @@ document.addEventListener('keydown', function(e) {
 // ========================================
 loadThemeColor();
 const savedScreen = localStorage.getItem('seizu_screen');
-if (savedScreen && savedScreen !== 'timer' && savedScreen !== 'review') {
+if (savedScreen && savedScreen !== 'review') {
   showScreen(savedScreen);
 } else {
   renderHome();
