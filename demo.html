@@ -1217,35 +1217,53 @@ function renderBreakdownChart(sessions) {
     select.appendChild(opt);
   });
   const filterName = select.value;
-  const showNames = filterName ? [filterName] : allStepNames;
+  const isAll = !filterName;
+  const showNames = isAll ? allStepNames : [filterName];
   const colors = generateColors(allStepNames.length);
-  const datasets = showNames.map(name => {
-    const idx = allStepNames.indexOf(name);
-    return {
+  const labels = sessions.map(s => formatDateShort(s.date));
+  const scalesY = { beginAtZero: true, ticks: { color: '#8b8d98', callback: v => v + '分' }, grid: { color: '#2a2d3a' } };
+  const scalesX = { ticks: { color: '#8b8d98', maxRotation: 45 }, grid: { display: false } };
+
+  if (isAll) {
+    const datasets = showNames.map((name, i) => ({
       label: name,
       data: sessions.map(s => {
         const st = s.steps.find(x => x.name === name);
         return st ? Math.round(st.actualTime / 60) : 0;
       }),
+      backgroundColor: colors[allStepNames.indexOf(name)]
+    }));
+    chartBreakdown = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { stacked: true, ...scalesX }, y: { stacked: true, ...scalesY } }
+      }
+    });
+  } else {
+    const idx = allStepNames.indexOf(filterName);
+    const datasets = [{
+      label: filterName,
+      data: sessions.map(s => {
+        const st = s.steps.find(x => x.name === filterName);
+        return st ? Math.round(st.actualTime / 60) : 0;
+      }),
       borderColor: colors[idx],
       backgroundColor: 'transparent',
       borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#fff', tension: 0
-    };
-  });
-  chartBreakdown = new Chart(ctx, {
-    type: 'line',
-    data: { labels: sessions.map(s => formatDateShort(s.date)), datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: showNames.length > 1, position: 'bottom',
-        labels: { color: '#8b8d98', font: { size: 10 }, padding: 8, boxWidth: 12 }
-      }},
-      scales: {
-        x: { ticks: { color: '#8b8d98', maxRotation: 45 }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { color: '#8b8d98', callback: v => v + '分' }, grid: { color: '#2a2d3a' } }
+    }];
+    chartBreakdown = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: scalesX, y: scalesY }
       }
-    }
-  });
+    });
+  }
 }
 
 function updateBreakdownVisibility() {
@@ -1734,6 +1752,7 @@ function generateDemoData() {
 loadThemeColor();
 generateDemoData();
 showScreen('analysis');
+tryResumeSession();
 </script>
 </body>
 </html>
