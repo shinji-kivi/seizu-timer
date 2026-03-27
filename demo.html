@@ -1695,19 +1695,20 @@ document.addEventListener('keydown', function(e) {
 // Init
 // ========================================
 function generateDemoData() {
-  if (getSessions().length > 0) return;
+  localStorage.removeItem(STORAGE_KEYS.sessions);
+  localStorage.removeItem(STORAGE_KEYS.stats);
   const tasks = ['課題No.1 図書館', '課題No.2 集合住宅', '課題No.3 福祉施設', '課題No.4 事務所ビル', '課題No.5 美術館'];
-  const modes = ['full', 'full', 'full', 'esquisse', 'esquisse', 'drawing', 'drawing', 'writing'];
+  const modes = ['full', 'full', 'full', 'full', 'esquisse', 'esquisse', 'drawing', 'drawing', 'writing'];
   const sessions = [];
   const stats = { totalSessions: 0, bestTimes: {} };
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 30; i++) {
     const mode = modes[i % modes.length];
     const template = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES[mode]));
-    const dayOffset = 12 - i;
+    const dayOffset = 60 - (i * 2);
     const date = new Date();
     date.setDate(date.getDate() - dayOffset);
     date.setHours(9 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 60));
-    const improvement = 1 - (i * 0.02);
+    const improvement = 1 - (i * 0.008);
     const steps = template.map(s => {
       const variance = 0.7 + Math.random() * 0.6;
       const actual = s.targetTime * variance * improvement;
