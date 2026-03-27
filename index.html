@@ -527,7 +527,6 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   </div>
   <div class="filter-bar">
     <select id="analysis-mode-filter" onchange="renderAnalysis()">
-      <option value="">全モード</option>
       <option value="full">フル</option>
       <option value="esquisse">エスキス</option>
       <option value="drawing">作図</option>
@@ -1182,7 +1181,7 @@ function renderProgressChart(sessions) {
         borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4a9eff',
         backgroundColor: 'rgba(74,158,255,0.1)',
         borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#fff',
-        fill: true, tension: 0.3
+        fill: true, tension: 0
       }]
     },
     options: {
@@ -1210,7 +1209,7 @@ function renderBreakdownChart(sessions) {
     }),
     borderColor: colors[i],
     backgroundColor: 'transparent',
-    borderWidth: 2, pointRadius: 3, tension: 0.3
+    borderWidth: 2, pointRadius: 3, tension: 0
   }));
   chartBreakdown = new Chart(ctx, {
     type: 'line',
@@ -1220,7 +1219,26 @@ function renderBreakdownChart(sessions) {
       plugins: {
         legend: {
           display: true, position: 'bottom',
-          labels: { color: '#8b8d98', boxWidth: 12, font: { size: 10 }, padding: 8 }
+          labels: {
+            color: '#8b8d98', font: { size: 10 }, padding: 8, boxWidth: 0,
+            generateLabels: function(chart) {
+              return chart.data.datasets.map((ds, i) => {
+                const visible = chart.isDatasetVisible(i);
+                return {
+                  text: (visible ? '\u2713 ' : '\u3000') + ds.label,
+                  fillStyle: 'transparent', strokeStyle: 'transparent',
+                  fontColor: visible ? ds.borderColor : '#555',
+                  hidden: false, datasetIndex: i
+                };
+              });
+            }
+          },
+          onClick: function(e, item, legend) {
+            const idx = item.datasetIndex;
+            const chart = legend.chart;
+            chart.setDatasetVisibility(idx, !chart.isDatasetVisible(idx));
+            chart.update();
+          }
         }
       },
       scales: {
