@@ -792,16 +792,15 @@ function clearActiveSession() {
 
 function tryResumeSession() {
   const raw = localStorage.getItem(STORAGE_KEYS.activeSession);
-  if (!raw) return;
+  if (!raw) {
+    // セッションデータがないのにタイマー画面ならホームへ
+    if (currentScreen === 'timer') { showScreen('home'); }
+    return;
+  }
   try {
     const data = JSON.parse(raw);
-    if (!data.steps || !data.taskName) { clearActiveSession(); return; }
+    if (!data.steps || !data.taskName) { clearActiveSession(); if (currentScreen === 'timer') showScreen('home'); return; }
     const elapsed = data.paused ? 0 : (Date.now() - data.savedAt) / 1000;
-    if (!confirm('中断されたセッションがあります。\n' +
-      '課題: ' + data.taskName + ' / ' + MODE_LABELS[data.mode] + '\n' +
-      '経過: ' + formatTime(data.totalElapsed + elapsed) + '\n\n再開しますか？')) {
-      clearActiveSession(); return;
-    }
     timerState = {
       running: true, paused: true,
       mode: data.mode, taskName: data.taskName, memo: data.memo,
@@ -814,7 +813,7 @@ function tryResumeSession() {
     renderTimerUI();
     togglePause();
     timerState.intervalId = setInterval(timerTick, 100);
-  } catch { clearActiveSession(); }
+  } catch { clearActiveSession(); if (currentScreen === 'timer') showScreen('home'); }
 }
 
 function startSession() {
