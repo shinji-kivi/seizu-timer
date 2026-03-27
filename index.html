@@ -1736,6 +1736,13 @@ if (savedScreen && savedScreen !== 'review') {
   renderHome();
 }
 tryResumeSession();
+
+window.addEventListener('beforeunload', (e) => {
+  if (timerState.running && !timerState.paused) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 </script>
 </body>
 </html>
