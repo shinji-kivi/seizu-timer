@@ -28,7 +28,7 @@ This software uses Chart.js (https://www.chartjs.org/) - MIT License
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>製図時間管理ツール</title>
+<title>製図時間管理ツール（デモ）</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 <style>
 :root {
@@ -621,26 +621,10 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <button class="back-btn" onclick="showScreen('home')">&larr;</button>
     <h1>要望・改善リクエスト</h1>
   </div>
-  <div class="card">
-    <div class="form-group">
-      <label>ハンドルネーム / Xアカウント</label>
-      <input type="text" id="feedback-name" placeholder="例：@your_account">
-    </div>
-    <div class="form-group">
-      <label>カテゴリ</label>
-      <select id="feedback-category">
-        <option value="機能追加">機能追加</option>
-        <option value="改善">改善</option>
-        <option value="バグ報告">バグ報告</option>
-        <option value="その他">その他</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>内容</label>
-      <textarea id="feedback-body" rows="5" placeholder="追加してほしい機能や改善してほしいところを書いてください"></textarea>
-    </div>
-    <button class="btn btn-primary btn-block" onclick="submitFeedback()">送信（GitHubが開きます）</button>
-    <p style="color:var(--text-dim);font-size:0.75rem;margin-top:8px;text-align:center">GitHubアカウントが必要です。Issueとして投稿されます。</p>
+  <div class="card" style="text-align:center">
+    <p style="margin-bottom:16px">追加してほしい機能や改善点があれば、お気軽にお送りください。</p>
+    <a class="btn btn-primary btn-block" href="https://docs.google.com/forms/d/e/1FAIpQLSdq0xRbLbR5gZq39-7m_T8PpwgBsUtnnK-5tAs3KFDtr6kO3Q/viewform" target="_blank" rel="noopener">フォームを開く</a>
+    <p style="color:var(--text-dim);font-size:0.75rem;margin-top:8px">アカウント登録不要です</p>
   </div>
 </div>
 
@@ -1575,7 +1559,7 @@ function validateImport(data) {
     if (typeof s.id !== 'string' || typeof s.date !== 'string' ||
         typeof s.taskName !== 'string' || typeof s.mode !== 'string' ||
         typeof s.totalTime !== 'number' || !Array.isArray(s.steps)) return false;
-    if (!['full','esquisse','drawing'].includes(s.mode)) return false;
+    if (!['full','esquisse','drawing','writing'].includes(s.mode)) return false;
     for (const st of s.steps) {
       if (typeof st.name !== 'string' || typeof st.targetTime !== 'number' ||
           typeof st.actualTime !== 'number') return false;
@@ -1741,25 +1725,6 @@ document.addEventListener('keydown', function(e) {
     togglePause();
   }
 });
-
-// ========================================
-// 15. Feedback
-// ========================================
-function submitFeedback() {
-  const name = document.getElementById('feedback-name').value.trim();
-  const category = document.getElementById('feedback-category').value;
-  const body = document.getElementById('feedback-body').value.trim();
-  if (!body) { alert('内容を入力してください'); return; }
-  const title = '[' + category + '] ' + body.substring(0, 50) + (body.length > 50 ? '...' : '');
-  const issueBody = '## カテゴリ\n' + category + '\n\n' +
-    '## 投稿者\n' + (name || '匿名') + '\n\n' +
-    '## 内容\n' + body;
-  const url = 'https://github.com/shinji-kivi/seizu-timer/issues/new' +
-    '?title=' + encodeURIComponent(title) +
-    '&body=' + encodeURIComponent(issueBody) +
-    '&labels=' + encodeURIComponent(category);
-  window.open(url, '_blank');
-}
 
 // ========================================
 // Init
