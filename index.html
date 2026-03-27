@@ -289,7 +289,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 }
 .filter-bar select { width:auto; min-width:120px; padding:8px 12px; font-size:0.85rem; }
 .chart-container { position:relative; margin-bottom:24px; background:var(--bg-card); border-radius:var(--radius); padding:16px; }
-.chart-container canvas { max-height:300px; }
+.chart-container canvas { min-height:300px; max-height:450px; }
 .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
 .stat-card { background:var(--bg-card); border-radius:var(--radius); padding:16px; text-align:center; }
 .stat-card .stat-value { font-size:1.5rem; font-weight:700; color:var(--accent); }
@@ -1173,22 +1173,23 @@ function renderProgressChart(sessions) {
   if (chartProgress) chartProgress.destroy();
   if (sessions.length === 0) { ctx.parentElement.innerHTML = '<canvas id="chart-progress"></canvas><div class="empty-state">データなし</div>'; return; }
   chartProgress = new Chart(ctx, {
-    type: 'bar',
+    type: 'line',
     data: {
-      labels: sessions.map((s,i) => formatDateShort(s.date)),
+      labels: sessions.map(s => formatDateShort(s.date)),
       datasets: [{
         label: '合計時間(分)',
         data: sessions.map(s => Math.round(s.totalTime / 60)),
-        backgroundColor: 'rgba(74,158,255,0.6)',
-        borderColor: 'rgba(74,158,255,1)',
-        borderWidth: 1
+        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#4a9eff',
+        backgroundColor: 'rgba(74,158,255,0.1)',
+        borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#fff',
+        fill: true, tension: 0.3
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        y: { beginAtZero: true, ticks: { color: '#8b8d98' }, grid: { color: '#2a2d3a' } },
+        y: { beginAtZero: true, ticks: { color: '#8b8d98', callback: v => v + '分' }, grid: { color: '#2a2d3a' } },
         x: { ticks: { color: '#8b8d98', maxRotation: 45 }, grid: { display: false } }
       }
     }
@@ -1207,17 +1208,24 @@ function renderBreakdownChart(sessions) {
       const st = s.steps.find(x => x.name === name);
       return st ? Math.round(st.actualTime / 60) : 0;
     }),
-    backgroundColor: colors[i]
+    borderColor: colors[i],
+    backgroundColor: 'transparent',
+    borderWidth: 2, pointRadius: 3, tension: 0.3
   }));
   chartBreakdown = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: sessions.map((s,i) => formatDateShort(s.date)), datasets },
+    type: 'line',
+    data: { labels: sessions.map(s => formatDateShort(s.date)), datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: {
+          display: true, position: 'bottom',
+          labels: { color: '#8b8d98', boxWidth: 12, font: { size: 10 }, padding: 8 }
+        }
+      },
       scales: {
-        x: { stacked: true, ticks: { color: '#8b8d98' }, grid: { display: false } },
-        y: { stacked: true, ticks: { color: '#8b8d98' }, grid: { color: '#2a2d3a' } }
+        x: { ticks: { color: '#8b8d98', maxRotation: 45 }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#8b8d98', callback: v => v + '分' }, grid: { color: '#2a2d3a' } }
       }
     }
   });
