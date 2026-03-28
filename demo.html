@@ -207,7 +207,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   display:flex; flex-direction:column; flex:1;
 }
 @media (max-width:768px) and (orientation:portrait) {
-  .lap-btn { aspect-ratio:1/1; }
+  .lap-btn { aspect-ratio:1.618/1; }
 }
 .lap-btn:hover { filter:brightness(1.1); }
 .timer-controls .btn-outline,
@@ -649,7 +649,8 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 const STORAGE_KEYS = {
   sessions: 'demo_seizu_sessions',
   templates: 'demo_seizu_templates',
-  stats: 'demo_seizu_stats'
+  stats: 'demo_seizu_stats',
+  activeSession: 'demo_seizu_active_session'
 };
 
 const DEFAULT_TEMPLATES = {
@@ -778,6 +779,43 @@ let timerState = {
 };
 
 
+function saveActiveSession() {
+  if (!timerState.running) return;
+  const data = {
+    mode: timerState.mode, taskName: timerState.taskName, memo: timerState.memo,
+    steps: timerState.steps, currentStep: timerState.currentStep,
+    totalElapsed: timerState.totalElapsed, stepElapsed: timerState.stepElapsed,
+    laps: timerState.laps, paused: timerState.paused,
+    savedAt: Date.now()
+  };
+  localStorage.setItem(STORAGE_KEYS.activeSession, JSON.stringify(data));
+}
+
+function clearActiveSession() {
+  localStorage.removeItem(STORAGE_KEYS.activeSession);
+}
+
+function tryResumeSession() {
+  const raw = localStorage.getItem(STORAGE_KEYS.activeSession);
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    if (!data.steps || !data.taskName) { clearActiveSession(); return; }
+    const elapsed = data.paused ? 0 : (Date.now() - data.savedAt) / 1000;
+    timerState = {
+      running: true, paused: false,
+      mode: data.mode, taskName: data.taskName, memo: data.memo,
+      steps: data.steps, currentStep: data.currentStep,
+      totalElapsed: data.totalElapsed + elapsed,
+      stepElapsed: data.stepElapsed + elapsed,
+      intervalId: null, laps: data.laps
+    };
+    showScreen('timer');
+    renderTimerUI();
+    timerState.intervalId = setInterval(timerTick, 100);
+  } catch { clearActiveSession(); }
+}
+
 function startSession() {
   const taskName = document.getElementById('setup-task').value.trim();
   const mode = document.getElementById('setup-mode').value;
@@ -793,18 +831,21 @@ function startSession() {
   showScreen('timer');
   renderTimerUI();
   timerState.intervalId = setInterval(timerTick, 100);
+  saveActiveSession();
 }
 
 let lastTickTime = 0;
+let lastSaveTime = 0;
 function timerTick() {
   if (!timerState.running || timerState.paused) return;
   const now = performance.now();
-  if (lastTickTime === 0) { lastTickTime = now; return; }
+  if (lastTickTime === 0) { lastTickTime = now; lastSaveTime = now; return; }
   const delta = (now - lastTickTime) / 1000;
   lastTickTime = now;
   timerState.totalElapsed += delta;
   timerState.stepElapsed += delta;
   updateTimerDisplay();
+  if (now - lastSaveTime > 5000) { lastSaveTime = now; saveActiveSession(); }
 }
 
 function updateTimerDisplay() {
@@ -863,6 +904,7 @@ function lap() {
   if (timerState.currentStep < timerState.steps.length - 1) {
     timerState.currentStep++;
     renderTimerUI();
+    saveActiveSession();
   } else {
     finishSession();
   }
@@ -876,6 +918,7 @@ function togglePause() {
     display.classList.add('timer-paused');
     document.getElementById('btn-pause').innerHTML = '再開<br><span class="key-hint-inline">Space</span>';
     lastTickTime = 0;
+    saveActiveSession();
   } else {
     display.classList.remove('timer-paused');
     document.getElementById('btn-pause').innerHTML = '一時停止<br><span class="key-hint-inline">Space</span>';
@@ -886,6 +929,7 @@ function togglePause() {
 function finishSession() {
   timerState.running = false;
   if (timerState.intervalId) clearInterval(timerState.intervalId);
+  clearActiveSession();
   if (timerState.currentStep < timerState.steps.length &&
       timerState.laps.length <= timerState.currentStep) {
     const step = timerState.steps[timerState.currentStep];
@@ -1017,7 +1061,12 @@ function saveSession() {
 }
 
 function discardSession() {
-  if (confirm('保存せずに終了しますか？')) { clearActiveSession(); showScreen('home'); }
+  if (confirm('保存せずに終了しますか？')) {
+    clearActiveSession();
+    timerState.running = false;
+    if (timerState.intervalId) { clearInterval(timerState.intervalId); timerState.intervalId = null; }
+    showScreen('home');
+  }
 }
 
 // ========================================
@@ -1730,7 +1779,7 @@ if (savedScreen) {
 } else {
   renderHome();
 }
-
+tryResumeSession();
 </script>
 </body>
 </html>
