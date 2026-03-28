@@ -1,0 +1,519 @@
+<!--
+MIT License
+
+Copyright (c) 2026
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>使い方 - 製図時間管理ツール</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-input: #252833;
+  --text: #e8e8ed;
+  --text-dim: #8b8d98;
+  --accent: #4a9eff;
+  --good: #34d399;
+  --bad: #f87171;
+  --warn: #fbbf24;
+  --border: #2a2d3a;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+}
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+.site-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.site-header h1 {
+  font-size: 1.2rem;
+  flex: 1;
+}
+.site-header a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.site-header a:hover { background: rgba(74,158,255,0.1); }
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.page-subtitle {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  margin-bottom: 32px;
+}
+/* TOC */
+.toc {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 32px;
+}
+.toc h2 {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+.toc ol {
+  list-style: none;
+  counter-reset: toc;
+}
+.toc li {
+  counter-increment: toc;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+}
+.toc li:last-child { border-bottom: none; }
+.toc li::before {
+  content: counter(toc) ". ";
+  color: var(--accent);
+  font-weight: 600;
+}
+.toc a { color: var(--text); text-decoration: none; }
+.toc a:hover { color: var(--accent); }
+/* Sections */
+.section {
+  margin-bottom: 40px;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent);
+}
+.section-num {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.section-header h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--accent);
+}
+.card p, .card li {
+  font-size: 0.92rem;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.card p + p { margin-top: 6px; }
+.card ul, .card ol {
+  padding-left: 20px;
+  margin-top: 6px;
+}
+.card li { margin-bottom: 4px; }
+.tag {
+  display: inline-block;
+  background: var(--bg-input);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.82rem;
+  color: var(--text);
+  margin: 2px 2px;
+  white-space: nowrap;
+}
+.tag-accent { background: rgba(74,158,255,0.2); color: var(--accent); }
+.tag-good { background: rgba(52,211,153,0.15); color: var(--good); }
+.tag-bad { background: rgba(248,113,113,0.15); color: var(--bad); }
+.tip {
+  background: rgba(74,158,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  margin-top: 10px;
+  font-size: 0.87rem;
+  color: var(--text-dim);
+}
+.warn-box {
+  background: rgba(251,191,36,0.08);
+  border-left: 3px solid var(--warn);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px;
+  margin-top: 10px;
+  font-size: 0.87rem;
+  color: var(--text-dim);
+}
+.step-list {
+  list-style: none;
+  padding: 0;
+  counter-reset: step;
+}
+.step-list li {
+  counter-increment: step;
+  padding: 8px 0 8px 36px;
+  position: relative;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.92rem;
+  color: var(--text-dim);
+}
+.step-list li:last-child { border-bottom: none; }
+.step-list li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.mode-item {
+  background: var(--bg-input);
+  border-radius: 8px;
+  padding: 12px;
+}
+.mode-item .name { font-size: 0.9rem; font-weight: 600; color: var(--accent); }
+.mode-item .time { font-size: 0.82rem; color: var(--text-dim); margin-top: 2px; }
+.mode-item .desc { font-size: 0.82rem; color: var(--text-dim); margin-top:4px; line-height: 1.5; }
+.kbd {
+  display: inline-block;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.82rem;
+  font-family: monospace;
+  color: var(--text);
+}
+/* Footer */
+footer {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+footer a { color: var(--accent); text-decoration: none; }
+@media (max-width: 480px) {
+  .mode-grid { grid-template-columns: 1fr; }
+  .page-title { font-size: 1.4rem; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="site-header">
+    <h1>製図時間管理ツール</h1>
+    <a href="index.html">アプリを開く</a>
+  </div>
+
+  <h1 class="page-title">使い方ガイド</h1>
+  <p class="page-subtitle">一級建築士製図試験の時間管理ツール 操作マニュアル</p>
+
+  <nav class="toc">
+    <h2>目次</h2>
+    <ol>
+      <li><a href="#about">このアプリについて</a></li>
+      <li><a href="#home">ホーム画面</a></li>
+      <li><a href="#setup">セッション設定</a></li>
+      <li><a href="#timer">タイマー操作</a></li>
+      <li><a href="#review">振り返り</a></li>
+      <li><a href="#history">履歴</a></li>
+      <li><a href="#analysis">分析</a></li>
+      <li><a href="#settings">設定</a></li>
+      <li><a href="#data">データの管理</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. About -->
+  <section class="section" id="about">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <h2>このアプリについて</h2>
+    </div>
+    <div class="card">
+      <p>一級建築士製図試験の練習時間を工程ごとに計測・記録し、成長を分析するWebアプリです。</p>
+      <ul style="margin-top:10px">
+        <li>インストール不要、ブラウザだけで動作</li>
+        <li>スマートフォン・タブレット・PCすべてに対応</li>
+        <li>データはすべてこの端末内にのみ保存（外部サーバーへの送信なし）</li>
+      </ul>
+      <div class="warn-box">ブラウザのデータを消去するとすべての記録が失われます。定期的にJSONバックアップをお勧めします。</div>
+    </div>
+  </section>
+
+  <!-- 2. Home -->
+  <section class="section" id="home">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <h2>ホーム画面</h2>
+    </div>
+    <div class="card">
+      <h3>練習回数・ベストタイム・前回タイム</h3>
+      <p>モードごとの練習回数、ベストタイム、前回タイムを表示します。セッションを重ねるほど数値が蓄積されます。</p>
+    </div>
+    <div class="card">
+      <h3>メニュー</h3>
+      <ul>
+        <li><span class="tag tag-accent">新規セッション</span> 練習を開始します</li>
+        <li><span class="tag">履歴</span> 過去の記録を一覧表示</li>
+        <li><span class="tag">分析</span> グラフで成長を確認</li>
+        <li><span class="tag">設定</span> 工程・テーマ・データ管理</li>
+        <li><span class="tag">要望</span> 改善リクエストを送る</li>
+        <li><span class="tag">?</span> この使い方ガイド（アプリ内）</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 3. Setup -->
+  <section class="section" id="setup">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <h2>セッション設定</h2>
+    </div>
+    <div class="card">
+      <h3>課題名</h3>
+      <p>練習する課題名を入力します（例：課題No.3 福祉施設）。過去に入力した課題名はサジェスト表示されます。</p>
+    </div>
+    <div class="card">
+      <h3>モード選択</h3>
+      <div class="mode-grid">
+        <div class="mode-item">
+          <div class="name">フル</div>
+          <div class="time">390分</div>
+          <div class="desc">エスキスから作図・記述まで全工程</div>
+        </div>
+        <div class="mode-item">
+          <div class="name">エスキスのみ</div>
+          <div class="time">150分</div>
+          <div class="desc">問題読み取りからエスキス完了まで</div>
+        </div>
+        <div class="mode-item">
+          <div class="name">作図のみ</div>
+          <div class="time">180分</div>
+          <div class="desc">作図・断面図・外構など作図工程のみ</div>
+        </div>
+        <div class="mode-item">
+          <div class="name">記述のみ</div>
+          <div class="time">60分</div>
+          <div class="desc">計画の要点（記述）のみ</div>
+        </div>
+      </div>
+      <div class="tip">モードを変えると工程一覧と目標時間が切り替わります。工程は設定画面でカスタマイズ可能です。</div>
+    </div>
+  </section>
+
+  <!-- 4. Timer -->
+  <section class="section" id="timer">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <h2>タイマー操作</h2>
+    </div>
+    <div class="card">
+      <h3>画面の見方</h3>
+      <ul>
+        <li>大きな数字：経過時間（合計）</li>
+        <li>現在の工程名と工程タイマー</li>
+        <li>目標時間（目標を超えると赤字表示）</li>
+        <li>次の工程名</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>ボタン操作</h3>
+      <ul>
+        <li><span class="tag tag-accent">次の工程へ</span> 現在の工程を記録して次へ進む。最終工程では「完了」と表示され、押すと振り返りへ。</li>
+        <li><span class="tag">一時停止</span> タイマーを一時停止。再度押すと再開。</li>
+        <li><span class="tag tag-bad">終了</span> 現在の工程を最後として振り返りへ進む。</li>
+      </ul>
+      <div class="tip">PCキーボードショートカット：<span class="kbd">Enter</span> = 次の工程 ／ <span class="kbd">Space</span> = 一時停止</div>
+    </div>
+    <div class="card">
+      <h3>リロード・中断について</h3>
+      <p>計測中にページをリロードしても、タイマーは自動的に復元されます（一時停止状態で再開）。</p>
+    </div>
+  </section>
+
+  <!-- 5. Review -->
+  <section class="section" id="review">
+    <div class="section-header">
+      <div class="section-num">5</div>
+      <h2>振り返り</h2>
+    </div>
+    <div class="card">
+      <h3>工程ごとの比較</h3>
+      <p>各工程について「今回・目標・過去平均」の3つのタイムを比較できます。</p>
+    </div>
+    <div class="card">
+      <h3>Good / Bad 評価</h3>
+      <p>目標時間内に収まった工程は自動で <span class="tag tag-good">Good</span>、超えた工程は <span class="tag tag-bad">Bad</span> がセットされます。タップして変更することもできます。</p>
+      <p style="margin-top:6px">工程ごとにメモを残すことも可能です。</p>
+    </div>
+    <div class="card">
+      <h3>保存・破棄</h3>
+      <ul>
+        <li><span class="tag tag-accent">保存する</span> 評価・メモを含めて履歴に記録</li>
+        <li><span class="tag">保存せず終了</span> 記録せずホームへ戻る</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 6. History -->
+  <section class="section" id="history">
+    <div class="section-header">
+      <div class="section-num">6</div>
+      <h2>履歴</h2>
+    </div>
+    <div class="card">
+      <p>保存したセッションを新しい順に一覧表示します。モードでフィルタできます。</p>
+      <p style="margin-top:6px">カードをタップすると工程ごとの詳細（タイム・評価・メモ）が確認でき、セッションの削除も行えます。</p>
+    </div>
+  </section>
+
+  <!-- 7. Analysis -->
+  <section class="section" id="analysis">
+    <div class="section-header">
+      <div class="section-num">7</div>
+      <h2>分析</h2>
+    </div>
+    <div class="card">
+      <h3>成長推移</h3>
+      <p>合計タイムの変化を折れ線グラフで表示します。練習を重ねるごとに短縮されていく様子を確認できます。</p>
+    </div>
+    <div class="card">
+      <h3>工程内訳</h3>
+      <p>「全工程」を選ぶとセッションごとの工程別時間を積み上げ棒グラフで表示。プルダウンで特定の工程を選ぶと折れ線グラフで推移を確認できます。</p>
+    </div>
+    <div class="card">
+      <h3>工程比較</h3>
+      <p>各工程の平均・最速・最遅タイムを一覧表示します。苦手工程の把握に役立ちます。</p>
+    </div>
+    <div class="card">
+      <h3>評価分析</h3>
+      <p>工程ごとのGood率を表示します。Badが多い工程は赤線でハイライトされるため、重点的に練習すべき工程がひと目でわかります。</p>
+      <div class="tip">モード・課題名でフィルタして特定条件での分析も可能です。</div>
+    </div>
+  </section>
+
+  <!-- 8. Settings -->
+  <section class="section" id="settings">
+    <div class="section-header">
+      <div class="section-num">8</div>
+      <h2>設定</h2>
+    </div>
+    <div class="card">
+      <h3>工程カスタマイズ</h3>
+      <p>モードごとに工程名・目標時間を変更できます。行をドラッグすることで順番の入れ替えも可能です。</p>
+      <ul style="margin-top:8px">
+        <li>「＋ 工程追加」で新しい工程を追加</li>
+        <li>「デフォルトに戻す」で初期設定に戻す</li>
+        <li>「保存」で反映（フルモードは合計390分になるよう確認が入ります）</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>テーマカラー</h3>
+      <p>アクセントカラーをプリセット8色またはカスタムカラーから選べます。</p>
+    </div>
+  </section>
+
+  <!-- 9. Data -->
+  <section class="section" id="data">
+    <div class="section-header">
+      <div class="section-num">9</div>
+      <h2>データの管理</h2>
+    </div>
+    <div class="card">
+      <h3>JSONバックアップ</h3>
+      <p>すべてのデータをJSONファイルとしてエクスポートできます。別の端末に移行したいときや、ブラウザデータを消去する前にバックアップを取ってください。インポートで既存データに追加できます。</p>
+    </div>
+    <div class="card">
+      <h3>CSVエクスポート</h3>
+      <p>全セッションデータをCSVとしてダウンロードできます。Googleスプレッドシートで直接開けます。時間は分単位（秒以下は切り上げ）で記録されます。</p>
+    </div>
+    <div class="card">
+      <h3>全データリセット</h3>
+      <p>すべての履歴・設定を削除します。この操作は元に戻せません。実行前にJSONバックアップを取ることを強くお勧めします。</p>
+      <div class="warn-box">削除したデータは復元できません。必ずバックアップを取ってから実行してください。</div>
+    </div>
+  </section>
+
+  <footer>
+    <p>製図時間管理ツール &mdash; 一級建築士製図試験用</p>
+    <p style="margin-top:6px"><a href="index.html">アプリを開く</a> &nbsp;|&nbsp; <a href="https://github.com/shinji-kivi/seizu-timer" target="_blank" rel="noopener">GitHub</a></p>
+  </footer>
+
+</div>
+</body>
+</html>
