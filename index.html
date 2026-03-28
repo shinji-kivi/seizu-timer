@@ -206,6 +206,9 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   font-size:1.3rem; padding:20px; min-height:64px;
   display:flex; flex-direction:column; flex:1;
 }
+@media (max-width:768px) and (orientation:portrait) {
+  .lap-btn { aspect-ratio:1/1; }
+}
 .lap-btn:hover { filter:brightness(1.1); }
 .timer-controls .btn-outline,
 .timer-controls .btn-danger { display:flex; flex-direction:column; }
@@ -435,8 +438,9 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   </div>
   <div class="form-group">
     <label>課題名</label>
-    <input type="text" id="setup-task" placeholder="例：課題No.3 福祉施設" list="task-suggestions" autocomplete="off">
+    <input type="text" id="setup-task" placeholder="例：課題No.3 福祉施設" list="task-suggestions" autocomplete="off" oninput="document.getElementById('task-error').style.display='none'">
     <datalist id="task-suggestions"></datalist>
+    <p id="task-error" style="display:none;color:var(--bad);font-size:0.85rem;margin-top:6px">課題名を記入してください</p>
   </div>
   <div class="form-group">
     <label>モード</label>
@@ -778,7 +782,7 @@ function startSession() {
   const taskName = document.getElementById('setup-task').value.trim();
   const mode = document.getElementById('setup-mode').value;
   const memo = document.getElementById('setup-memo').value.trim();
-  if (!taskName) { alert('課題名を入力してください'); return; }
+  if (!taskName) { document.getElementById('task-error').style.display='block'; document.getElementById('setup-task').focus(); return; }
   const templates = getTemplates();
   timerState = {
     running: true, paused: false, mode, taskName, memo,
