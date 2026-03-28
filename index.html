@@ -748,7 +748,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   currentScreen = id;
-  localStorage.setItem('seizu_screen', id);
+  if (id !== 'timer' && id !== 'review') localStorage.setItem('seizu_screen', id);
   window.scrollTo(0, 0);
   if (id === 'home') renderHome();
   if (id === 'history') renderHistory();
@@ -1727,14 +1727,7 @@ document.addEventListener('keydown', function(e) {
 // ========================================
 loadThemeColor();
 const savedScreen = localStorage.getItem('seizu_screen');
-if (savedScreen === 'timer') {
-  // タイマー画面はactiveSessionがある場合のみ復元、なければホーム
-  if (localStorage.getItem(STORAGE_KEYS.activeSession)) {
-    tryResumeSession();
-  } else {
-    renderHome();
-  }
-} else if (savedScreen && savedScreen !== 'review') {
+if (savedScreen) {
   showScreen(savedScreen);
 } else {
   renderHome();
