@@ -401,9 +401,10 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 
 <!-- ===== HOME ===== -->
 <div id="screen-home" class="screen active">
-  <div class="home-title">
+  <div class="home-title" style="position:relative">
     <h1 style="font-size:1.4rem;">製図時間管理ツール</h1>
     <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">一級建築士 製図試験</p>
+    <button onclick="showScreen('help')" style="position:absolute;top:0;right:0;background:none;border:1px solid var(--border);border-radius:50%;width:32px;height:32px;color:var(--text-dim);font-size:0.9rem;cursor:pointer;line-height:1">?</button>
   </div>
   <div class="home-stats" id="home-stats"></div>
   <div class="menu-card menu-card-main" onclick="showScreen('setup')">
@@ -616,6 +617,81 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     </div>
     <h3 style="margin-bottom:12px;color:var(--bad)">データリセット</h3>
     <button class="btn btn-danger" onclick="confirmResetAll()">全データを削除</button>
+  </div>
+</div>
+
+<!-- ===== HELP ===== -->
+<div id="screen-help" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">&larr;</button>
+    <h1>使い方</h1>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:8px">このアプリについて</h3>
+    <p style="font-size:0.9rem;color:var(--text-dim);line-height:1.6">一級建築士製図試験の練習時間を工程ごとに計測・記録し、成長を分析するツールです。データはすべてこの端末にのみ保存され、外部には送信されません。</p>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">セッションを始める</h3>
+    <div style="font-size:0.9rem;line-height:1.8">
+      <p><strong>① 課題名</strong>を入力（例：課題No.3 福祉施設）</p>
+      <p><strong>② モード</strong>を選択</p>
+      <div style="margin-left:12px;color:var(--text-dim);font-size:0.85rem">
+        <p>フル：390分フル通し</p>
+        <p>エスキスのみ：エスキスまで</p>
+        <p>作図のみ：作図・断面図のみ</p>
+        <p>記述のみ：計画の要点のみ</p>
+      </div>
+      <p style="margin-top:4px"><strong>③ 計測開始</strong>を押す</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">タイマー操作</h3>
+    <div style="font-size:0.9rem;line-height:1.8">
+      <p><strong>次の工程へ</strong>：現在の工程を記録して次へ進む</p>
+      <p><strong>一時停止</strong>：タイマーを止める（再開で再スタート）</p>
+      <p><strong>終了</strong>：最後の工程として記録し振り返りへ</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">PCキーボード：Enter = 次の工程 / Space = 一時停止</p>
+      <p style="color:var(--bad);font-size:0.85rem">工程タイマーが目標時間を超えると赤字表示</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">振り返り</h3>
+    <div style="font-size:0.9rem;line-height:1.8">
+      <p>各工程の実績・目標・過去平均を比較できます。</p>
+      <p><strong>Good / Bad</strong>で各工程を評価（目標との比較で自動設定）</p>
+      <p>メモを入力して<strong>保存する</strong>を押すと履歴に記録されます。</p>
+      <p><strong>保存せず終了</strong>：記録せずホームへ戻ります。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">分析</h3>
+    <div style="font-size:0.9rem;line-height:1.8">
+      <p><strong>成長推移</strong>：合計タイムの変化を折れ線で表示</p>
+      <p><strong>工程内訳</strong>：全工程の積み上げ棒グラフ、または工程を選んで折れ線表示</p>
+      <p><strong>工程比較</strong>：各工程の平均・最速・最遅タイム</p>
+      <p><strong>評価分析</strong>：工程ごとのGood率（Bad多い工程を強調表示）</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">モード・課題名でフィルタ可能</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">設定</h3>
+    <div style="font-size:0.9rem;line-height:1.8">
+      <p><strong>工程カスタマイズ</strong>：工程名・目標時間の変更、順番の入れ替え</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">フルモードは合計390分になるよう設定（保存時に確認）</p>
+      <p><strong>テーマカラー</strong>：アクセントカラーを変更</p>
+      <p><strong>データ管理</strong>：JSONバックアップ・CSVエクスポート・全データリセット</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:8px">データについて</h3>
+    <p style="font-size:0.9rem;color:var(--text-dim);line-height:1.6">すべてのデータはこの端末のブラウザ（localStorage）にのみ保存されます。ブラウザのデータを削除すると消えるため、定期的にJSONバックアップをお勧めします。</p>
   </div>
 </div>
 
