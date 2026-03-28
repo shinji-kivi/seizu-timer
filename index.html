@@ -792,14 +792,10 @@ function clearActiveSession() {
 
 function tryResumeSession() {
   const raw = localStorage.getItem(STORAGE_KEYS.activeSession);
-  if (!raw) {
-    // セッションデータがないのにタイマー画面ならホームへ
-    if (currentScreen === 'timer') { showScreen('home'); }
-    return;
-  }
+  if (!raw) return;
   try {
     const data = JSON.parse(raw);
-    if (!data.steps || !data.taskName) { clearActiveSession(); if (currentScreen === 'timer') showScreen('home'); return; }
+    if (!data.steps || !data.taskName) { clearActiveSession(); return; }
     const elapsed = data.paused ? 0 : (Date.now() - data.savedAt) / 1000;
     timerState = {
       running: true, paused: true,
@@ -813,7 +809,7 @@ function tryResumeSession() {
     renderTimerUI();
     togglePause();
     timerState.intervalId = setInterval(timerTick, 100);
-  } catch { clearActiveSession(); if (currentScreen === 'timer') showScreen('home'); }
+  } catch { clearActiveSession(); }
 }
 
 function startSession() {
@@ -1731,12 +1727,18 @@ document.addEventListener('keydown', function(e) {
 // ========================================
 loadThemeColor();
 const savedScreen = localStorage.getItem('seizu_screen');
-if (savedScreen && savedScreen !== 'review') {
+if (savedScreen === 'timer') {
+  // タイマー画面はactiveSessionがある場合のみ復元、なければホーム
+  if (localStorage.getItem(STORAGE_KEYS.activeSession)) {
+    tryResumeSession();
+  } else {
+    renderHome();
+  }
+} else if (savedScreen && savedScreen !== 'review') {
   showScreen(savedScreen);
 } else {
   renderHome();
 }
-tryResumeSession();
 
 window.addEventListener('beforeunload', (e) => {
   if (timerState.running && !timerState.paused) {
