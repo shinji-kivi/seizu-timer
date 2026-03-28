@@ -645,8 +645,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 const STORAGE_KEYS = {
   sessions: 'seizu_sessions',
   templates: 'seizu_templates',
-  stats: 'seizu_stats',
-  activeSession: 'seizu_active_session'
+  stats: 'seizu_stats'
 };
 
 const DEFAULT_TEMPLATES = {
@@ -774,43 +773,6 @@ let timerState = {
   laps: []
 };
 
-function saveActiveSession() {
-  if (!timerState.running) return;
-  const data = {
-    mode: timerState.mode, taskName: timerState.taskName, memo: timerState.memo,
-    steps: timerState.steps, currentStep: timerState.currentStep,
-    totalElapsed: timerState.totalElapsed, stepElapsed: timerState.stepElapsed,
-    laps: timerState.laps, paused: timerState.paused,
-    savedAt: Date.now()
-  };
-  localStorage.setItem(STORAGE_KEYS.activeSession, JSON.stringify(data));
-}
-
-function clearActiveSession() {
-  localStorage.removeItem(STORAGE_KEYS.activeSession);
-}
-
-function tryResumeSession() {
-  const raw = localStorage.getItem(STORAGE_KEYS.activeSession);
-  if (!raw) return;
-  try {
-    const data = JSON.parse(raw);
-    if (!data.steps || !data.taskName) { clearActiveSession(); return; }
-    const elapsed = data.paused ? 0 : (Date.now() - data.savedAt) / 1000;
-    timerState = {
-      running: true, paused: true,
-      mode: data.mode, taskName: data.taskName, memo: data.memo,
-      steps: data.steps, currentStep: data.currentStep,
-      totalElapsed: data.totalElapsed + elapsed,
-      stepElapsed: data.stepElapsed + elapsed,
-      intervalId: null, laps: data.laps
-    };
-    showScreen('timer');
-    renderTimerUI();
-    togglePause();
-    timerState.intervalId = setInterval(timerTick, 100);
-  } catch { clearActiveSession(); }
-}
 
 function startSession() {
   const taskName = document.getElementById('setup-task').value.trim();
@@ -827,21 +789,18 @@ function startSession() {
   showScreen('timer');
   renderTimerUI();
   timerState.intervalId = setInterval(timerTick, 100);
-  saveActiveSession();
 }
 
 let lastTickTime = 0;
-let lastSaveTime = 0;
 function timerTick() {
   if (!timerState.running || timerState.paused) return;
   const now = performance.now();
-  if (lastTickTime === 0) { lastTickTime = now; lastSaveTime = now; return; }
+  if (lastTickTime === 0) { lastTickTime = now; return; }
   const delta = (now - lastTickTime) / 1000;
   lastTickTime = now;
   timerState.totalElapsed += delta;
   timerState.stepElapsed += delta;
   updateTimerDisplay();
-  if (now - lastSaveTime > 5000) { lastSaveTime = now; saveActiveSession(); }
 }
 
 function updateTimerDisplay() {
@@ -900,7 +859,6 @@ function lap() {
   if (timerState.currentStep < timerState.steps.length - 1) {
     timerState.currentStep++;
     renderTimerUI();
-    saveActiveSession();
   } else {
     finishSession();
   }
@@ -914,7 +872,6 @@ function togglePause() {
     display.classList.add('timer-paused');
     document.getElementById('btn-pause').innerHTML = '再開<br><span class="key-hint-inline">Space</span>';
     lastTickTime = 0;
-    saveActiveSession();
   } else {
     display.classList.remove('timer-paused');
     document.getElementById('btn-pause').innerHTML = '一時停止<br><span class="key-hint-inline">Space</span>';
@@ -925,7 +882,6 @@ function togglePause() {
 function finishSession() {
   timerState.running = false;
   if (timerState.intervalId) clearInterval(timerState.intervalId);
-  clearActiveSession();
   if (timerState.currentStep < timerState.steps.length &&
       timerState.laps.length <= timerState.currentStep) {
     const step = timerState.steps[timerState.currentStep];
@@ -1733,13 +1689,6 @@ if (savedScreen) {
   renderHome();
 }
 
-window.addEventListener('beforeunload', (e) => {
-  if (timerState.running && !timerState.paused) {
-    e.preventDefault();
-    e.returnValue = 'タイマー計測中です。ページを離れますか？';
-    return e.returnValue;
-  }
-});
 </script>
 </body>
 </html>
