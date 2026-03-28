@@ -1061,12 +1061,10 @@ function saveSession() {
 }
 
 function discardSession() {
-  if (confirm('保存せずに終了しますか？')) {
-    clearActiveSession();
-    timerState.running = false;
-    if (timerState.intervalId) { clearInterval(timerState.intervalId); timerState.intervalId = null; }
-    showScreen('home');
-  }
+  clearActiveSession();
+  timerState.running = false;
+  if (timerState.intervalId) { clearInterval(timerState.intervalId); timerState.intervalId = null; }
+  showScreen('home');
 }
 
 // ========================================
