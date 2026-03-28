@@ -831,6 +831,7 @@ function startSession() {
   showScreen('timer');
   renderTimerUI();
   timerState.intervalId = setInterval(timerTick, 100);
+  saveActiveSession();
 }
 
 let lastTickTime = 0;
