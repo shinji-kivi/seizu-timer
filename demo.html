@@ -27,8 +27,18 @@ This software uses Chart.js (https://www.chartjs.org/) - MIT License
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- user-scalable=no は付けない。文字が見えにくい人のピンチズームを奪わないため -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>製図時間管理ツール（デモ）</title>
+<meta name="description" content="一級建築士製図試験の練習時間を工程ごとに計測・記録・分析するツール。インストール不要、記録は端末内にのみ保存されます。">
+<!-- SNS で共有したときのカード表示 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="製図時間管理ツール">
+<meta property="og:title" content="製図時間管理ツール｜一級建築士 製図試験の練習用タイマー">
+<meta property="og:description" content="工程ごとにラップを取り、目標との差と成長を記録。インストール不要・無料、記録は端末内にのみ保存されます。">
+<meta property="og:url" content="https://shinji-kivi.github.io/seizu-timer/">
+<meta property="og:image" content="https://shinji-kivi.github.io/seizu-timer/ogp.png">
+<meta name="twitter:card" content="summary_large_image">
 <!-- PWA: ホーム画面に追加すると全画面で起動し、オフラインでも動く -->
 <meta name="theme-color" content="#0f1117">
 <meta name="mobile-web-app-capable" content="yes">
@@ -382,6 +392,35 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   transition:all 0.15s;
 }
 .tab-btn.active { background:var(--accent); color:#fff; }
+
+/* 確認・通知ダイアログ。
+   alert() / confirm() は一部のモバイル環境でブロックされ、削除が無言で失敗するなどの
+   事故になるため、ブラウザ標準に頼らず自前で用意する */
+.dialog-overlay {
+  position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.65);
+  display:none; align-items:center; justify-content:center; z-index:1200; padding:20px;
+}
+.dialog-overlay.show { display:flex; }
+.dialog-box {
+  background:var(--bg-card); border-radius:var(--radius); padding:22px;
+  max-width:400px; width:100%; box-shadow:var(--shadow);
+}
+.dialog-title { font-weight:600; margin-bottom:10px; font-size:1rem; }
+.dialog-message { font-size:0.92rem; line-height:1.7; white-space:pre-wrap; }
+.dialog-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; flex-wrap:wrap; }
+
+/* 想定外エラーの通知バー */
+.error-bar {
+  position:fixed; left:0; right:0; bottom:0; z-index:1300;
+  background:var(--bad); color:#fff; padding:12px 16px; font-size:0.85rem;
+  display:none; align-items:center; gap:12px; line-height:1.5;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+.error-bar.show { display:flex; }
+.error-bar button {
+  margin-left:auto; flex-shrink:0; background:rgba(0,0,0,0.25); border:none; color:#fff;
+  border-radius:6px; padding:6px 12px; cursor:pointer; font-size:0.85rem;
+}
 </style>
 </head>
 <body>
@@ -697,7 +736,19 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 
   <div class="card">
     <h3 style="margin-bottom:8px">データについて</h3>
-    <p style="font-size:0.9rem;color:var(--text-dim);line-height:1.6">すべてのデータはこの端末のブラウザ（localStorage）にのみ保存されます。ブラウザのデータを削除すると消えるため、定期的にJSONバックアップをお勧めします。</p>
+    <p style="font-size:0.9rem;color:var(--text-dim);line-height:1.6">すべてのデータはこの端末のブラウザ（localStorage）にのみ保存されます。外部への送信はありません。</p>
+    <p style="font-size:0.9rem;color:var(--bad);line-height:1.6;margin-top:8px">次の場合は記録が消えます。<strong>設定 → データ管理 → エクスポート</strong>で定期的にバックアップを取ってください。</p>
+    <div style="font-size:0.85rem;color:var(--text-dim);line-height:1.7;margin-top:4px">
+      <p>・ブラウザの閲覧データ（Cookie・サイトデータ）を削除したとき</p>
+      <p>・プライベートブラウズで使ったとき</p>
+      <p>・iPhone / iPad で、ホーム画面に追加せず長期間開かなかったとき</p>
+      <p>・別の端末・別のブラウザで開いたとき（記録は共有されません）</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:8px">免責</h3>
+    <p style="font-size:0.9rem;color:var(--text-dim);line-height:1.6">工程と目標時間は練習の目安です。試験の結果を保証するものではありません。本ツールの利用によって生じた不利益について、作者は責任を負いません（MIT License）。</p>
   </div>
   <a class="btn btn-outline btn-block" href="help.html" target="_blank" rel="noopener" style="margin-top:4px">詳細ガイドを開く（別ページ）</a>
 </div>
@@ -725,6 +776,24 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   </div>
 </div>
 
+<!-- 確認・通知ダイアログ -->
+<div class="dialog-overlay" id="dialog-overlay">
+  <div class="dialog-box">
+    <div class="dialog-title" id="dialog-title"></div>
+    <div class="dialog-message" id="dialog-message"></div>
+    <div class="dialog-btns">
+      <button class="btn btn-outline btn-sm" id="dialog-cancel">キャンセル</button>
+      <button class="btn btn-primary btn-sm" id="dialog-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- 想定外エラーの通知 -->
+<div class="error-bar" id="error-bar">
+  <span id="error-bar-text"></span>
+  <button onclick="this.parentElement.classList.remove('show')">閉じる</button>
+</div>
+
 <script>
 // ========================================
 // 1. Constants & Default Templates
@@ -733,8 +802,38 @@ const STORAGE_KEYS = {
   sessions: 'demo_seizu_sessions',
   templates: 'demo_seizu_templates',
   stats: 'demo_seizu_stats',
-  activeSession: 'demo_seizu_active_session'
+  activeSession: 'demo_seizu_active_session',
+  introSeen: 'demo_seizu_intro_seen'
 };
+
+// ========================================
+// 1.5 Dialog (alert / confirm の置き換え)
+// ========================================
+let dialogResolve = null;
+function openDialog(title, message, okLabel, cancelLabel) {
+  return new Promise(resolve => {
+    dialogResolve = resolve;
+    document.getElementById('dialog-title').textContent = title;
+    document.getElementById('dialog-message').textContent = message;
+    const ok = document.getElementById('dialog-ok');
+    const cancel = document.getElementById('dialog-cancel');
+    ok.textContent = okLabel || 'OK';
+    cancel.textContent = cancelLabel || 'キャンセル';
+    cancel.style.display = cancelLabel === null ? 'none' : '';
+    document.getElementById('dialog-overlay').classList.add('show');
+    ok.onclick = () => closeDialog(true);
+    cancel.onclick = () => closeDialog(false);
+  });
+}
+function closeDialog(value) {
+  document.getElementById('dialog-overlay').classList.remove('show');
+  if (dialogResolve) { const r = dialogResolve; dialogResolve = null; r(value); }
+}
+// 通知（OKのみ）。cancelLabel に null を渡すとキャンセルボタンを消す
+function notify(message, title) { return openDialog(title || 'お知らせ', message, 'OK', null); }
+function askConfirm(message, okLabel, title, cancelLabel) {
+  return openDialog(title || '確認', message, okLabel || 'OK', cancelLabel || 'キャンセル');
+}
 
 const DEFAULT_TEMPLATES = {
   full: [
@@ -807,8 +906,18 @@ function getSessions() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.sessions)) || []; }
   catch { return []; }
 }
+// LocalStorage への書き込みは失敗しうる（保存領域が一杯、プライベートブラウズ等）。
+// 黙って失敗すると計測結果をそのまま失うため、必ず成否を返して呼び出し側で扱う
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 function saveSessions(sessions) {
-  localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(sessions));
+  return writeStorage(STORAGE_KEYS.sessions, JSON.stringify(sessions));
 }
 // 工程テンプレートの妥当性チェック。壊れたテンプレートを取り込むとアプリが起動不能になるため、
 // 全モードが「name(文字列)と targetTime(正の数)を持つ工程の配列」であることまで確認する
@@ -830,14 +939,14 @@ function getTemplates() {
   return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
 }
 function saveTemplates(templates) {
-  localStorage.setItem(STORAGE_KEYS.templates, JSON.stringify(templates));
+  return writeStorage(STORAGE_KEYS.templates, JSON.stringify(templates));
 }
 function getStats() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.stats)) || { totalSessions: 0, bestTimes: {} }; }
   catch { return { totalSessions: 0, bestTimes: {} }; }
 }
 function saveStats(stats) {
-  localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(stats));
+  return writeStorage(STORAGE_KEYS.stats, JSON.stringify(stats));
 }
 // ベストタイムを取り出す。未記録なら null（Infinity は JSON 保存で null 化するのでここで吸収）
 function getBestTotal(stats, mode) {
@@ -872,7 +981,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   currentScreen = id;
-  if (id !== 'timer' && id !== 'review') localStorage.setItem('demo_seizu_screen', id);
+  if (id !== 'timer' && id !== 'review') writeStorage('demo_seizu_screen', id);
   window.scrollTo(0, 0);
   if (id === 'home') renderHome();
   if (id === 'history') renderHistory();
@@ -912,7 +1021,7 @@ function saveActiveSession(phase) {
     completed: !!timerState.completed,
     savedAt: Date.now()
   };
-  localStorage.setItem(STORAGE_KEYS.activeSession, JSON.stringify(data));
+  writeStorage(STORAGE_KEYS.activeSession, JSON.stringify(data));
 }
 
 function clearActiveSession() {
@@ -1187,7 +1296,8 @@ function saveSession() {
   const prevBest = getBestTotal(getStats(), session.mode);
   const sessions = getSessions();
   sessions.push(session);
-  saveSessions(sessions);
+  // 保存に失敗したら振り返り画面に留まる。ここでホームへ戻すと計測結果が消える
+  if (!saveSessions(sessions)) { handleSaveFailure(session); return; }
   clearActiveSession();
   recalcStats();
 
@@ -1199,6 +1309,28 @@ function saveSession() {
   document.getElementById('setup-task').value = '';
   document.getElementById('setup-memo').value = '';
   showScreen('home');
+}
+
+// 保存できなかったときの逃げ道。計測結果をファイルとして持ち出せるようにする
+async function handleSaveFailure(session) {
+  const ok = await askConfirm(
+    'この端末のブラウザに記録を保存できませんでした。\n\n' +
+    '保存領域がいっぱいか、プライベートブラウズなど保存が制限された状態の可能性があります。' +
+    '古い履歴を削除するか、通常のウィンドウで開き直すと保存できることがあります。\n\n' +
+    '「ファイルに保存」を押すと今回の記録をファイルとして書き出せます。' +
+    '後で設定画面の「インポート」から取り込めます。',
+    'ファイルに保存', '保存に失敗しました', '閉じる');
+  if (ok) {
+    const data = {
+      version: 1,
+      exportDate: new Date().toISOString(),
+      sessions: [session],
+      templates: getTemplates(),
+      stats: getStats()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, 'seizu_rescue_' + formatDateFile(new Date()) + '.json');
+  }
 }
 
 function discardSession() {
@@ -1301,8 +1433,8 @@ function showSessionDetail(id) {
   showScreen('detail');
 }
 
-function deleteSession(id) {
-  if (!confirm('このセッションを削除しますか？')) return;
+async function deleteSession(id) {
+  if (!await askConfirm('このセッションを削除しますか？', '削除する')) return;
   const sessions = getSessions().filter(s => s.id !== id);
   saveSessions(sessions);
   // 削除した回がベストだった場合に備えて作り直す
@@ -1587,25 +1719,25 @@ function removeStep(idx) {
   renderStepEditorList();
 }
 
-function saveSteps() {
+async function saveSteps() {
   const mode = document.getElementById('settings-mode').value;
-  if (editingSteps.length === 0) { alert('工程が1つもありません。1つ以上追加してください。'); return; }
+  if (editingSteps.length === 0) { notify('工程が1つもありません。1つ以上追加してください。'); return; }
   editingSteps.forEach(s => { s.name = String(s.name || '').trim(); });
-  if (editingSteps.some(s => !s.name)) { alert('工程名が空の項目があります。名前を入力してください。'); return; }
+  if (editingSteps.some(s => !s.name)) { notify('工程名が空の項目があります。名前を入力してください。'); return; }
   if (mode === 'full') {
     const totalMin = editingSteps.reduce((sum, s) => sum + Math.round(s.targetTime / 60), 0);
     if (totalMin !== 390) {
-      if (!confirm('合計が' + totalMin + '分です（目標: 390分）。このまま保存しますか？')) return;
+      if (!await askConfirm('合計が' + totalMin + '分です（目標: 390分）。このまま保存しますか？', '保存する')) return;
     }
   }
   const templates = getTemplates();
   templates[mode] = editingSteps;
   saveTemplates(templates);
-  alert('保存しました');
+  notify('保存しました');
 }
 
-function resetStepsToDefault() {
-  if (!confirm('デフォルトの工程に戻しますか？')) return;
+async function resetStepsToDefault() {
+  if (!await askConfirm('デフォルトの工程に戻しますか？', '戻す')) return;
   const mode = document.getElementById('settings-mode').value;
   editingSteps = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES[mode]));
   renderStepEditorList();
@@ -1657,7 +1789,7 @@ function getThemeColor() {
 }
 
 function applyThemeColor(color) {
-  localStorage.setItem('demo_seizu_theme_color', color);
+  writeStorage('demo_seizu_theme_color', color);
   document.documentElement.style.setProperty('--accent', color);
   // accent-hoverを少し暗くする
   document.documentElement.style.setProperty('--accent-hover', darkenColor(color, 15));
@@ -1701,11 +1833,11 @@ function importJSON(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const data = JSON.parse(e.target.result);
-      if (!validateImport(data)) { alert('無効なファイル形式です'); return; }
-      if (!confirm('インポートすると現在のデータに追加されます。続行しますか？')) return;
+      if (!validateImport(data)) { notify('このファイルは読み込めませんでした。このツールで書き出した JSON ファイルを選んでください。', '無効なファイル'); return; }
+      if (!await askConfirm('インポートすると現在のデータに追加されます。続行しますか？', '取り込む')) return;
       const currentSessions = getSessions();
       const existingIds = new Set(currentSessions.map(s => s.id));
       const newSessions = (data.sessions || []).filter(s => !existingIds.has(s.id));
@@ -1717,10 +1849,10 @@ function importJSON(event) {
         else note = '\n（工程テンプレートは形式が不正なため取り込みませんでした）';
       }
       recalcStats();
-      alert(newSessions.length + '件のセッションをインポートしました' + note);
+      notify(newSessions.length + '件のセッションをインポートしました' + note);
       renderHome();
     } catch (err) {
-      alert('ファイルの読み込みに失敗しました');
+      notify('ファイルの読み込みに失敗しました。ファイルが壊れている可能性があります。', '読み込みエラー');
     }
   };
   reader.readAsText(file);
@@ -1746,7 +1878,7 @@ function validateImport(data) {
 
 function exportCSV() {
   const sessions = getSessions();
-  if (sessions.length === 0) { alert('エクスポートするデータがありません'); return; }
+  if (sessions.length === 0) { notify('エクスポートするデータがありません'); return; }
   const BOM = '\uFEFF';
   const headers = ['実施日','課題名','モード','工程番号','工程名','目標時間(分)','実績時間(分)','評価','メモ','合計時間(分)'];
   let csv = BOM + headers.join(',') + '\n';
@@ -1781,15 +1913,15 @@ function csvEscape(str) {
   return str;
 }
 
-function confirmResetAll() {
-  if (!confirm('本当にすべてのデータを削除しますか？\nこの操作は元に戻せません。')) return;
-  if (!confirm('最終確認：全データを完全に削除します。よろしいですか？')) return;
+async function confirmResetAll() {
+  if (!await askConfirm('すべての履歴・設定を削除します。この操作は元に戻せません。\n\n削除する前に「エクスポート」でバックアップを取ることを強くお勧めします。', '削除に進む', '全データを削除')) return;
+  if (!await askConfirm('最終確認です。本当に全データを完全に削除しますか？', '完全に削除する', '最終確認')) return;
   localStorage.removeItem(STORAGE_KEYS.sessions);
   localStorage.removeItem(STORAGE_KEYS.templates);
   localStorage.removeItem(STORAGE_KEYS.stats);
   // 中断中のセッションが残っていると削除後に復活するので一緒に消す
   clearActiveSession();
-  alert('全データを削除しました');
+  notify('全データを削除しました');
   renderHome();
 }
 
@@ -1961,16 +2093,53 @@ if (savedScreen) {
 } else {
   renderHome();
 }
-// ブラウザ標準のフォーム状態復元より後に走らせる（先に実行すると入力欄を空で上書きされる）
-window.addEventListener('load', tryResumeSession);
-
-// PWA: Service Worker を登録してオフライン動作を有効にする。
-// デモ版は本番のキャッシュを汚さないよう登録しない。file:// では登録できないので握りつぶす
-if ('serviceWorker' in navigator && !location.pathname.endsWith('demo.html')) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
+// 想定外のエラーで画面が固まったように見えたとき、何が起きたか分かるようにする。
+// 記録は保持されている旨を伝えて、再読み込みへ誘導する（何度も出さない）
+let errorNotified = false;
+function showErrorBar() {
+  if (errorNotified) return;
+  errorNotified = true;
+  document.getElementById('error-bar-text').textContent =
+    '予期しないエラーが発生しました。これまでの記録は保持されています。動作がおかしい場合はページを再読み込みしてください。';
+  document.getElementById('error-bar').classList.add('show');
 }
+window.addEventListener('error', showErrorBar);
+window.addEventListener('unhandledrejection', showErrorBar);
+
+// ブラウザに「このデータを勝手に消さないで」と要求する。
+// iOS Safari はしばらく使われないサイトの保存データを削除することがあるため
+if (navigator.storage && navigator.storage.persist) {
+  navigator.storage.persisted()
+    .then(already => { if (!already) return navigator.storage.persist(); })
+    .catch(() => {});
+}
+
+// 初めて開いた人向けの案内。SNS 等から来て前提を知らない人が
+// 何のツールか分からないまま離脱しないようにする
+async function showIntroIfFirstVisit() {
+  if (localStorage.getItem(STORAGE_KEYS.introSeen)) return;
+  writeStorage(STORAGE_KEYS.introSeen, '1');
+  if (getSessions().length > 0) return;
+  const openHelp = await askConfirm(
+    '一級建築士 製図試験（6時間30分）の練習用タイマーです。\n\n' +
+    '工程ごとに「次の工程へ」を押してラップを取ると、目標時間との差と、回を重ねたときの成長が記録されます。\n\n' +
+    '記録はこの端末の中だけに保存され、外部には送信されません。無料で、登録も不要です。',
+    '使い方を見る', '製図時間管理ツール', 'はじめる');
+  if (openHelp) showScreen('help');
+}
+
+window.addEventListener('load', () => {
+  // ブラウザ標準のフォーム状態復元より後に走らせる（先に実行すると入力欄を空で上書きされる）
+  tryResumeSession();
+  // 計測中・振り返り中に復帰したときは案内を割り込ませない
+  if (currentScreen !== 'timer' && currentScreen !== 'review') showIntroIfFirstVisit();
+
+  // PWA: Service Worker を登録してオフライン動作を有効にする。
+  // デモ版は本番のキャッシュを汚さないよう登録しない。file:// では登録できないので握りつぶす
+  if ('serviceWorker' in navigator && !location.pathname.endsWith('demo.html')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+});
 </script>
 </body>
 </html>

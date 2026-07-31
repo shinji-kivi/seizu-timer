@@ -8,7 +8,7 @@
 //
 // vendor/chart.umd.min.js やアイコンを差し替えたときは CACHE の版数を上げる
 // (HTML はネットワーク優先なので、HTML だけの更新では上げ直す必要はない)
-const CACHE = 'seizu-v1';
+const CACHE = 'seizu-v2';
 
 const ASSETS = [
   './',
@@ -18,7 +18,8 @@ const ASSETS = [
   './vendor/chart.umd.min.js',
   './icons/icon-180.png',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './ogp.png'
 ];
 
 self.addEventListener('install', event => {
