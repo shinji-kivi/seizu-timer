@@ -27,10 +27,17 @@ This software uses Chart.js (https://www.chartjs.org/) - MIT License
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>製図時間管理ツール（デモ）</title>
-<!-- integrity: CDN 上のファイルが差し替わったら読み込みを拒否する（改ざん検知）。Chart.js を更新したらハッシュも取り直すこと -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
+<!-- PWA: ホーム画面に追加すると全画面で起動し、オフラインでも動く -->
+<meta name="theme-color" content="#0f1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="製図タイマー">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<!-- Chart.js はリポジトリに同梱。オフラインでも分析画面が動き、CDN の停止・改ざんの影響も受けない -->
+<script src="vendor/chart.umd.min.js"></script>
 <style>
 :root {
   --bg: #0f1117;
@@ -56,12 +63,15 @@ body {
   min-height: 100dvh;
   overflow-x: hidden;
 }
-.screen { display:none; padding:16px; max-width:800px; margin:0 auto; padding-bottom: 80px; }
+/* env(safe-area-inset-*) は iPhone/iPad の全画面起動時にホームバー等と重ならないための余白。
+   非対応環境では 0 として扱われるので、通常のブラウザ表示には影響しない */
+.screen { display:none; padding:16px; max-width:800px; margin:0 auto; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 .screen.active { display:block; }
 #screen-timer { padding:0; padding-bottom:0; max-width:none; }
 #screen-timer.active { display:flex; }
 #screen-home {
-  display:none; height:100vh; height:100dvh; padding-bottom:16px;
+  display:none; height:100vh; height:100dvh;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
   overflow:hidden; box-sizing:border-box;
 }
 #screen-home.active {
@@ -144,6 +154,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 .timer-fullscreen {
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   height:100vh; height:100dvh; padding:12px; max-width:800px; margin:0 auto;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
   overflow:hidden;
 }
 .timer-display {
@@ -669,6 +680,18 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">フルモードは合計390分になるよう設定（保存時に確認）</p>
       <p><strong>テーマカラー</strong>：アクセントカラーを変更</p>
       <p><strong>データ管理</strong>：JSONバックアップ・CSVエクスポート・全データリセット</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:12px">ホーム画面に追加して使う</h3>
+    <div style="font-size:0.9rem;line-height:1.8">
+      <p>アプリとして追加すると、<strong>全画面で起動</strong>してブラウザのバーが消え、誤タップで画面が飛ぶ事故を防げます。<strong>オフラインでも動作</strong>します。</p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin-top:6px">
+        <p>iPhone / iPad：共有ボタン → 「ホーム画面に追加」</p>
+        <p>Android：メニュー → 「アプリをインストール」</p>
+        <p>PC（Chrome / Edge）：アドレスバー右のインストールアイコン</p>
+      </div>
     </div>
   </div>
 
@@ -1940,6 +1963,14 @@ if (savedScreen) {
 }
 // ブラウザ標準のフォーム状態復元より後に走らせる（先に実行すると入力欄を空で上書きされる）
 window.addEventListener('load', tryResumeSession);
+
+// PWA: Service Worker を登録してオフライン動作を有効にする。
+// デモ版は本番のキャッシュを汚さないよう登録しない。file:// では登録できないので握りつぶす
+if ('serviceWorker' in navigator && !location.pathname.endsWith('demo.html')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
