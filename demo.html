@@ -29,7 +29,8 @@ This software uses Chart.js (https://www.chartjs.org/) - MIT License
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>製図時間管理ツール（デモ）</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<!-- integrity: CDN 上のファイルが差し替わったら読み込みを拒否する（改ざん検知）。Chart.js を更新したらハッシュも取り直すこと -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" integrity="sha384-NrKB+u6Ts6AtkIhwPixiKTzgSKNblyhlk0Sohlgar9UHUBzai/sgnNNWWd291xqt" crossorigin="anonymous"></script>
 <style>
 :root {
   --bg: #0f1117;
@@ -216,18 +217,6 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 @keyframes blink { 50% { opacity:0.2; } }
 
 
-/* Step list in timer */
-.step-list-mini {
-  margin-top:16px; max-height:200px; overflow-y:auto;
-}
-.step-list-mini .step-item {
-  display:flex; justify-content:space-between; align-items:center;
-  padding:6px 0; font-size:0.85rem; border-bottom:1px solid var(--border);
-}
-.step-item.done { color:var(--text-dim); }
-.step-item.current { color:var(--accent); font-weight:600; }
-.step-item .step-actual { font-variant-numeric:tabular-nums; }
-
 /* Review screen */
 .review-step {
   background:var(--bg-card); border-radius:var(--radius);
@@ -382,19 +371,6 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   transition:all 0.15s;
 }
 .tab-btn.active { background:var(--accent); color:#fff; }
-
-/* Confirm dialog */
-.confirm-overlay {
-  position:fixed; top:0; left:0; right:0; bottom:0;
-  background:rgba(0,0,0,0.6); display:flex; align-items:center;
-  justify-content:center; z-index:1000;
-}
-.confirm-box {
-  background:var(--bg-card); border-radius:var(--radius); padding:24px;
-  max-width:360px; width:90%; text-align:center;
-}
-.confirm-box p { margin-bottom:16px; }
-.confirm-box .btns { display:flex; gap:8px; justify-content:center; }
 </style>
 </head>
 <body>
@@ -552,12 +528,18 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <button class="tab-btn" onclick="switchAnalysisTab('compare',this)">工程比較</button>
     <button class="tab-btn" onclick="switchAnalysisTab('rating',this)">評価分析</button>
   </div>
-  <div id="analysis-progress" class="chart-container"><canvas id="chart-progress"></canvas></div>
+  <div id="analysis-progress" class="chart-container">
+    <canvas id="chart-progress"></canvas>
+    <div id="progress-empty" class="empty-state" style="display:none">データなし</div>
+  </div>
   <div id="analysis-breakdown" style="display:none">
     <div style="margin-bottom:8px">
       <select id="breakdown-step-filter" onchange="updateBreakdownVisibility()" style="width:100%"></select>
     </div>
-    <div class="chart-container"><canvas id="chart-breakdown"></canvas></div>
+    <div class="chart-container">
+      <canvas id="chart-breakdown"></canvas>
+      <div id="breakdown-empty" class="empty-state" style="display:none">データなし</div>
+    </div>
   </div>
   <div id="analysis-compare" style="display:none"><div id="compare-content"></div></div>
   <div id="analysis-rating" style="display:none"><div id="rating-content"></div></div>
@@ -793,6 +775,7 @@ const DEFAULT_TEMPLATES = {
 };
 
 const MODE_LABELS = { full: 'フル', esquisse: 'エスキス', drawing: '作図', writing: '記述' };
+const MODES = Object.keys(MODE_LABELS);
 
 // ========================================
 // 2. Storage Layer
@@ -804,10 +787,22 @@ function getSessions() {
 function saveSessions(sessions) {
   localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(sessions));
 }
+// 工程テンプレートの妥当性チェック。壊れたテンプレートを取り込むとアプリが起動不能になるため、
+// 全モードが「name(文字列)と targetTime(正の数)を持つ工程の配列」であることまで確認する
+function validateTemplates(t) {
+  if (typeof t !== 'object' || t === null) return false;
+  return MODES.every(m => {
+    if (!Array.isArray(t[m]) || t[m].length === 0) return false;
+    return t[m].every(s =>
+      s && typeof s.name === 'string' && s.name.length > 0 &&
+      typeof s.targetTime === 'number' && isFinite(s.targetTime) && s.targetTime > 0
+    );
+  });
+}
 function getTemplates() {
   try {
     const t = JSON.parse(localStorage.getItem(STORAGE_KEYS.templates));
-    if (t && t.full && t.esquisse && t.drawing) return t;
+    if (validateTemplates(t)) return t;
   } catch {}
   return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
 }
@@ -1003,20 +998,6 @@ function renderTimerUI() {
   const lapLabel = timerState.currentStep < timerState.steps.length - 1 ? '次の工程へ \u25B6' : '完了 \u2713';
   document.getElementById('btn-lap').innerHTML = lapLabel + '<br><span class="key-hint-inline">Enter</span>';
   updateTimerDisplay();
-}
-
-function renderStepListMini() {
-  const el = document.getElementById('timer-step-list');
-  let html = '';
-  timerState.steps.forEach((s, i) => {
-    const cls = i < timerState.currentStep ? 'done' : (i === timerState.currentStep ? 'current' : '');
-    const actual = i < timerState.laps.length ? formatTimeMM(timerState.laps[i].actualTime) :
-                   (i === timerState.currentStep ? formatTimeMM(timerState.stepElapsed) : '--:--');
-    html += '<div class="step-item ' + cls + '">' +
-      '<span>' + escapeText((i+1) + '. ' + s.name) + '</span>' +
-      '<span class="step-actual">' + actual + '</span></div>';
-  });
-  el.innerHTML = html;
 }
 
 function lap() {
@@ -1338,10 +1319,18 @@ function renderAnalysis() {
   renderRatingAnalysis(filtered);
 }
 
+// データが無いときはキャンバスを隠して「データなし」を出すだけにする。
+// コンテナごと innerHTML を差し替えると、データが増えた後も「データなし」が残るため
+function toggleChartEmpty(canvasId, emptyId, isEmpty) {
+  document.getElementById(canvasId).style.display = isEmpty ? 'none' : '';
+  document.getElementById(emptyId).style.display = isEmpty ? '' : 'none';
+}
+
 function renderProgressChart(sessions) {
   const ctx = document.getElementById('chart-progress');
-  if (chartProgress) chartProgress.destroy();
-  if (sessions.length === 0) { ctx.parentElement.innerHTML = '<canvas id="chart-progress"></canvas><div class="empty-state">データなし</div>'; return; }
+  if (chartProgress) { chartProgress.destroy(); chartProgress = null; }
+  toggleChartEmpty('chart-progress', 'progress-empty', sessions.length === 0);
+  if (sessions.length === 0) return;
   chartProgress = new Chart(ctx, {
     type: 'line',
     data: {
@@ -1370,7 +1359,8 @@ let breakdownSessions = [];
 function renderBreakdownChart(sessions) {
   breakdownSessions = sessions;
   const ctx = document.getElementById('chart-breakdown');
-  if (chartBreakdown) chartBreakdown.destroy();
+  if (chartBreakdown) { chartBreakdown.destroy(); chartBreakdown = null; }
+  toggleChartEmpty('chart-breakdown', 'breakdown-empty', sessions.length === 0);
   if (sessions.length === 0) return;
   const allStepNames = sessions[sessions.length-1].steps.map(s => s.name);
   const select = document.getElementById('breakdown-step-filter');
@@ -1524,7 +1514,7 @@ function renderStepEditorList() {
       '<input type="text" value="' + escapeAttr(step.name) + '" ' +
         'oninput="editingSteps['+i+'].name=this.value">' +
       '<input type="number" value="' + Math.round(step.targetTime/60) + '" min="1" ' +
-        'oninput="editingSteps['+i+'].targetTime=parseInt(this.value||1)*60;updateStepTotal()" title="分">' +
+        'oninput="setStepTime('+i+',this.value)" onblur="this.value=Math.round(editingSteps['+i+'].targetTime/60)" title="分">' +
       '<span style="color:var(--text-dim);font-size:0.8rem">分</span>' +
       '<button class="remove-btn" onclick="removeStep('+i+')">&times;</button>';
     setupDrag(div, i);
@@ -1533,12 +1523,19 @@ function renderStepEditorList() {
   updateStepTotal();
 }
 
+// 目標時間は最低1分。空欄・0・数値以外が入っても壊れないように丸める
+function setStepTime(idx, val) {
+  const min = parseInt(val, 10);
+  editingSteps[idx].targetTime = (isFinite(min) && min > 0 ? min : 1) * 60;
+  updateStepTotal();
+}
+
 function updateStepTotal() {
   const mode = document.getElementById('settings-mode').value;
   const totalEl = document.getElementById('step-editor-total');
   const totalMin = editingSteps.reduce((sum, s) => sum + Math.round(s.targetTime / 60), 0);
   totalEl.style.display = '';
-  totalEl.textContent = '合計: ' + totalMin + '分';
+  totalEl.textContent = '合計: ' + totalMin + '分（' + formatDuration(totalMin * 60) + '）';
   totalEl.style.color = (mode === 'full' && totalMin !== 390) ? 'var(--bad)' : 'var(--text)';
 }
 
@@ -1569,6 +1566,9 @@ function removeStep(idx) {
 
 function saveSteps() {
   const mode = document.getElementById('settings-mode').value;
+  if (editingSteps.length === 0) { alert('工程が1つもありません。1つ以上追加してください。'); return; }
+  editingSteps.forEach(s => { s.name = String(s.name || '').trim(); });
+  if (editingSteps.some(s => !s.name)) { alert('工程名が空の項目があります。名前を入力してください。'); return; }
   if (mode === 'full') {
     const totalMin = editingSteps.reduce((sum, s) => sum + Math.round(s.targetTime / 60), 0);
     if (totalMin !== 390) {
@@ -1687,9 +1687,14 @@ function importJSON(event) {
       const existingIds = new Set(currentSessions.map(s => s.id));
       const newSessions = (data.sessions || []).filter(s => !existingIds.has(s.id));
       saveSessions([...currentSessions, ...newSessions]);
-      if (data.templates) saveTemplates(data.templates);
+      // 工程テンプレートは形式を確認できたものだけ取り込む（壊れていてもセッションは活かす）
+      let note = '';
+      if (data.templates) {
+        if (validateTemplates(data.templates)) saveTemplates(data.templates);
+        else note = '\n（工程テンプレートは形式が不正なため取り込みませんでした）';
+      }
       recalcStats();
-      alert(newSessions.length + '件のセッションをインポートしました');
+      alert(newSessions.length + '件のセッションをインポートしました' + note);
       renderHome();
     } catch (err) {
       alert('ファイルの読み込みに失敗しました');
@@ -1706,7 +1711,7 @@ function validateImport(data) {
     if (typeof s.id !== 'string' || typeof s.date !== 'string' ||
         typeof s.taskName !== 'string' || typeof s.mode !== 'string' ||
         typeof s.totalTime !== 'number' || !Array.isArray(s.steps)) return false;
-    if (!['full','esquisse','drawing','writing'].includes(s.mode)) return false;
+    if (!MODES.includes(s.mode)) return false;
     for (const st of s.steps) {
       if (typeof st.name !== 'string' || typeof st.targetTime !== 'number' ||
           typeof st.actualTime !== 'number') return false;
@@ -1796,6 +1801,14 @@ function formatTimeMM(sec) {
   const s = sec % 60;
   return m + ':' + String(s).padStart(2, '0');
 }
+// 目標時間の総量を読みやすく（「6時間30分」「45分」）。390:00 のような表記を避けるため
+function formatDuration(sec) {
+  const totalMin = Math.round(sec / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return m + '分';
+  return h + '時間' + (m > 0 ? m + '分' : '');
+}
 function formatDate(iso) {
   const d = new Date(iso);
   return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + ' ' +
@@ -1848,14 +1861,15 @@ function updateSetupPreview() {
   const dl = document.getElementById('task-suggestions');
   const names = [...new Set(getSessions().map(s => s.taskName).filter(Boolean))];
   dl.innerHTML = names.map(n => '<option value="' + escapeAttr(n) + '">').join('');
-  let html = '<div style="font-weight:600;margin-bottom:8px">工程一覧（合計 ' + formatTimeMM(total) + '）</div>';
+  let html = '<div style="font-weight:600;margin-bottom:8px">工程一覧（合計 ' + formatDuration(total) + '）</div>';
   let cumulative = 0;
   steps.forEach((s, i) => {
     cumulative += s.targetTime;
+    // 各工程は m:ss、累計は h:mm:ss（ホームのベストタイム表示と単位を揃える）
     html += '<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:3px 0;border-bottom:1px solid var(--border)">' +
       '<span>' + escapeText((i+1) + '. ' + s.name) + '</span>' +
       '<span style="font-variant-numeric:tabular-nums;color:var(--text-dim)">' +
-        formatTimeMM(s.targetTime) + ' (' + formatTimeMM(cumulative) + ')</span></div>';
+        formatTimeMM(s.targetTime) + ' (' + formatTime(cumulative) + ')</span></div>';
   });
   el.innerHTML = html;
 }
