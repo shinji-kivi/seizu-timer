@@ -495,7 +495,8 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div id="review-steps"></div>
   <div class="form-group" style="margin-top:16px">
     <label>セッション全体メモ</label>
-    <textarea id="review-memo" placeholder="全体の振り返りメモ..."></textarea>
+    <!-- autocomplete=off: リロード時のブラウザ標準フォーム復元が、復元した値を上書きするのを防ぐ -->
+    <textarea id="review-memo" placeholder="全体の振り返りメモ..." autocomplete="off" oninput="setSessionMemo(this.value)"></textarea>
   </div>
   <button class="btn btn-primary btn-block btn-lg" onclick="saveSession()">保存する</button>
   <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="discardSession()">保存せず終了</button>
@@ -820,6 +821,30 @@ function getStats() {
 function saveStats(stats) {
   localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(stats));
 }
+// ベストタイムを取り出す。未記録なら null（Infinity は JSON 保存で null 化するのでここで吸収）
+function getBestTotal(stats, mode) {
+  const bt = stats && stats.bestTimes && stats.bestTimes[mode];
+  if (!bt || typeof bt.total !== 'number' || !isFinite(bt.total)) return null;
+  return bt.total;
+}
+// セッション実データからベストタイム・回数を作り直す（削除・インポート後の整合用）
+function recalcStats() {
+  const sessions = getSessions();
+  const stats = { totalSessions: sessions.length, bestTimes: {} };
+  sessions.forEach(s => {
+    if (!stats.bestTimes[s.mode]) stats.bestTimes[s.mode] = { steps: {} };
+    const bt = stats.bestTimes[s.mode];
+    // 途中終了した回はベストタイムに数えない
+    if (s.completed !== false && (typeof bt.total !== 'number' || s.totalTime < bt.total)) {
+      bt.total = s.totalTime;
+    }
+    (s.steps || []).forEach(st => {
+      if (!bt.steps[st.name] || st.actualTime < bt.steps[st.name]) bt.steps[st.name] = st.actualTime;
+    });
+  });
+  saveStats(stats);
+  return stats;
+}
 
 // ========================================
 // 3. Navigation
@@ -856,13 +881,17 @@ let timerState = {
 };
 
 
-function saveActiveSession() {
-  if (!timerState.running) return;
+// phase: 'timer' = 計測中 / 'review' = 振り返り入力中
+function saveActiveSession(phase) {
+  phase = phase || 'timer';
+  if (phase === 'timer' && !timerState.running) return;
   const data = {
+    phase: phase,
     mode: timerState.mode, taskName: timerState.taskName, memo: timerState.memo,
     steps: timerState.steps, currentStep: timerState.currentStep,
     totalElapsed: timerState.totalElapsed, stepElapsed: timerState.stepElapsed,
     laps: timerState.laps, paused: timerState.paused,
+    completed: !!timerState.completed,
     savedAt: Date.now()
   };
   localStorage.setItem(STORAGE_KEYS.activeSession, JSON.stringify(data));
@@ -878,9 +907,26 @@ function tryResumeSession() {
   try {
     const data = JSON.parse(raw);
     if (!data.steps || !data.taskName) { clearActiveSession(); return; }
-    const elapsed = data.paused ? 0 : (Date.now() - data.savedAt) / 1000;
+    // 振り返り画面で中断していた場合は、計測を再開せず振り返りに戻す
+    if (data.phase === 'review') {
+      timerState = {
+        running: false, paused: false,
+        mode: data.mode, taskName: data.taskName, memo: data.memo,
+        steps: data.steps, currentStep: data.currentStep,
+        totalElapsed: data.totalElapsed, stepElapsed: 0,
+        intervalId: null, laps: data.laps || [],
+        completed: !!data.completed
+      };
+      showScreen('review');
+      renderReview();
+      setTimeout(syncReviewInputs, 0);
+      return;
+    }
+    // 一時停止中に中断していたら、停止したまま復元する（勝手に進めない）
+    const paused = !!data.paused;
+    const elapsed = paused ? 0 : (Date.now() - data.savedAt) / 1000;
     timerState = {
-      running: true, paused: false,
+      running: true, paused: paused,
       mode: data.mode, taskName: data.taskName, memo: data.memo,
       steps: data.steps, currentStep: data.currentStep,
       totalElapsed: data.totalElapsed + elapsed,
@@ -903,7 +949,7 @@ function startSession() {
     running: true, paused: false, mode, taskName, memo,
     steps: JSON.parse(JSON.stringify(templates[mode])),
     currentStep: 0, totalElapsed: 0, stepElapsed: 0,
-    intervalId: null, laps: []
+    intervalId: null, laps: [], completed: false
   };
   showScreen('timer');
   renderTimerUI();
@@ -943,11 +989,17 @@ function updateTimerDisplay() {
   }
 }
 
+// 一時停止の見た目（点滅・ボタン表示）を timerState.paused に同期させる
+function updatePauseUI() {
+  const display = document.getElementById('timer-display');
+  display.classList.toggle('timer-paused', timerState.paused);
+  document.getElementById('btn-pause').innerHTML =
+    (timerState.paused ? '再開' : '一時停止') + '<br><span class="key-hint-inline">Space</span>';
+}
+
 function renderTimerUI() {
   lastTickTime = 0;
-  const display = document.getElementById('timer-display');
-  display.classList.remove('timer-paused');
-  document.getElementById('btn-pause').innerHTML = '一時停止<br><span class="key-hint-inline">Space</span>';
+  updatePauseUI();
   const lapLabel = timerState.currentStep < timerState.steps.length - 1 ? '次の工程へ \u25B6' : '完了 \u2713';
   document.getElementById('btn-lap').innerHTML = lapLabel + '<br><span class="key-hint-inline">Enter</span>';
   updateTimerDisplay();
@@ -983,30 +1035,24 @@ function lap() {
     renderTimerUI();
     saveActiveSession();
   } else {
-    finishSession();
+    finishSession(true); // 最終工程までラップした = 完走
   }
 }
 
 function togglePause() {
   if (!timerState.running) return;
   timerState.paused = !timerState.paused;
-  const display = document.getElementById('timer-display');
-  if (timerState.paused) {
-    display.classList.add('timer-paused');
-    document.getElementById('btn-pause').innerHTML = '再開<br><span class="key-hint-inline">Space</span>';
-    lastTickTime = 0;
-    saveActiveSession();
-  } else {
-    display.classList.remove('timer-paused');
-    document.getElementById('btn-pause').innerHTML = '一時停止<br><span class="key-hint-inline">Space</span>';
-    lastTickTime = 0;
-  }
+  updatePauseUI();
+  lastTickTime = 0;
+  // 停止時・再開時とも保存する（再開時に savedAt を更新しないと復元時刻がずれる）
+  saveActiveSession();
 }
 
-function finishSession() {
+// isComplete: 最終工程までラップし切ったときのみ true（「終了」ボタン経由は false）
+function finishSession(isComplete) {
   timerState.running = false;
-  if (timerState.intervalId) clearInterval(timerState.intervalId);
-  clearActiveSession();
+  timerState.completed = !!isComplete;
+  if (timerState.intervalId) { clearInterval(timerState.intervalId); timerState.intervalId = null; }
   if (timerState.currentStep < timerState.steps.length &&
       timerState.laps.length <= timerState.currentStep) {
     const step = timerState.steps[timerState.currentStep];
@@ -1015,6 +1061,8 @@ function finishSession() {
       actualTime: timerState.stepElapsed, rating: null, memo: ''
     });
   }
+  // 保存を確定するまで復元用データを残す（振り返り中のリロード・クラッシュ対策）
+  saveActiveSession('review');
   showScreen('review');
   renderReview();
 }
@@ -1070,10 +1118,28 @@ function renderReview() {
         '<button class="rating-btn' + (lap.rating === 'good' ? ' selected-good' : '') + '" data-idx="'+i+'" data-val="good" onclick="setRating('+i+',\'good\',this)">&#128077; Good</button>' +
         '<button class="rating-btn' + (lap.rating === 'bad' ? ' selected-bad' : '') + '" data-idx="'+i+'" data-val="bad" onclick="setRating('+i+',\'bad\',this)">&#128078; Bad</button>' +
       '</div>' +
-      '<div class="review-memo"><input type="text" data-memo-idx="'+i+'" placeholder="メモ..." oninput="setLapMemo('+i+',this.value)"></div>';
+      '<div class="review-memo"><input type="text" data-memo-idx="'+i+'" value="' + escapeAttr(lap.memo || '') + '" placeholder="メモ..." autocomplete="off" oninput="setLapMemo('+i+',this.value)"></div>';
     container.appendChild(div);
   });
+  syncReviewInputs();
+  // 自動設定した評価も含めて復元用データに反映しておく
+  saveActiveSession('review');
+}
+
+// 入力欄に timerState の値を書き戻す。
+// ブラウザ標準のフォーム状態復元がレンダリング後に走って空で上書きすることがあるため、
+// 描画直後と、復元が終わったタイミング（次のイベントループ）の2回実行する。
+function syncReviewInputs() {
   document.getElementById('review-memo').value = timerState.memo || '';
+  timerState.laps.forEach((lap, i) => {
+    const input = document.querySelector('[data-memo-idx="' + i + '"]');
+    if (input) input.value = lap.memo || '';
+  });
+}
+
+function setSessionMemo(val) {
+  timerState.memo = val;
+  saveActiveSession('review');
 }
 
 function setRating(idx, val, btn) {
@@ -1086,10 +1152,12 @@ function setRating(idx, val, btn) {
   } else if (timerState.laps[idx].rating === 'bad') {
     btn.parentElement.querySelector('[data-val="bad"]').classList.add('selected-bad');
   }
+  saveActiveSession('review');
 }
 
 function setLapMemo(idx, val) {
   timerState.laps[idx].memo = val;
+  saveActiveSession('review');
 }
 
 function saveSession() {
@@ -1098,8 +1166,11 @@ function saveSession() {
     date: new Date().toISOString(),
     taskName: timerState.taskName,
     mode: timerState.mode,
-    memo: document.getElementById('review-memo').value.trim(),
+    // DOM ではなく timerState を正とする（oninput で同期済み。リロード復元時の取りこぼし防止）
+    memo: (timerState.memo || '').trim(),
     totalTime: timerState.totalElapsed,
+    // 最終工程までラップしたか。途中で「終了」した回はベスト・成長グラフの対象外にする
+    completed: timerState.completed === true,
     steps: timerState.laps.map(l => ({
       name: l.name,
       targetTime: l.targetTime,
@@ -1108,28 +1179,17 @@ function saveSession() {
       memo: l.memo
     }))
   };
+  // 更新前のベストを控えてから保存する（更新演出の判定用）
+  const prevBest = getBestTotal(getStats(), session.mode);
   const sessions = getSessions();
   sessions.push(session);
   saveSessions(sessions);
+  clearActiveSession();
+  recalcStats();
 
-  const stats = getStats();
-  stats.totalSessions = (stats.totalSessions || 0) + 1;
-  if (!stats.bestTimes) stats.bestTimes = {};
-  if (!stats.bestTimes[session.mode]) stats.bestTimes[session.mode] = { total: Infinity, steps: {} };
-  const bt = stats.bestTimes[session.mode];
-  let isBest = false;
-  if (session.totalTime < bt.total) {
-    bt.total = session.totalTime;
-    isBest = true;
-  }
-  session.steps.forEach(s => {
-    if (!bt.steps[s.name] || s.actualTime < bt.steps[s.name]) {
-      bt.steps[s.name] = s.actualTime;
-    }
-  });
-  saveStats(stats);
-
-  if (isBest && stats.totalSessions > 1) {
+  const completedCount = sessions.filter(s => s.mode === session.mode && s.completed !== false).length;
+  const isBest = session.completed && (prevBest === null || session.totalTime < prevBest);
+  if (isBest && completedCount > 1) {
     showBestTime(session.totalTime, session.mode);
   }
   document.getElementById('setup-task').value = '';
@@ -1150,7 +1210,6 @@ function discardSession() {
 function renderHome() {
   const sessions = getSessions();
   const stats = getStats();
-  const best = stats.bestTimes || {};
   const statsEl = document.getElementById('home-stats');
   const counts = { full: 0, esquisse: 0, drawing: 0, writing: 0 };
   sessions.forEach(s => { if (counts.hasOwnProperty(s.mode)) counts[s.mode]++; });
@@ -1160,7 +1219,8 @@ function renderHome() {
   const lastByMode = {};
   sessions.forEach(s => { lastByMode[s.mode] = s; });
   statsEl.innerHTML = modes.map(m => {
-    const bt = best[m] && best[m].total < Infinity ? formatTime(best[m].total) : '--:--:--';
+    const bestTotal = getBestTotal(stats, m);
+    const bt = bestTotal !== null ? formatTime(bestTotal) : '--:--:--';
     const last = lastByMode[m] ? formatTime(lastByMode[m].totalTime) : '--:--:--';
     return '<div class="home-stat">' +
       '<div class="value">' + counts[m] + '</div>' +
@@ -1173,6 +1233,12 @@ function renderHome() {
 // ========================================
 // 7. History
 // ========================================
+// 途中終了した回の目印（ベスト・成長グラフの対象外であることを示す）
+function incompleteBadge(s) {
+  if (s.completed !== false) return '';
+  return '<span class="mode-badge" style="background:rgba(251,191,36,0.15);color:var(--warn);margin-left:4px">途中終了</span>';
+}
+
 function renderHistory() {
   const sessions = getSessions();
   const filter = document.getElementById('history-mode-filter').value;
@@ -1191,7 +1257,7 @@ function renderHistory() {
       '<div class="history-card-header">' +
         '<div><div class="task-name">' + escapeText(s.taskName) + '</div>' +
         '<div class="date">' + formatDate(s.date) + '</div>' +
-        '<span class="mode-badge">' + MODE_LABELS[s.mode] + '</span></div>' +
+        '<span class="mode-badge">' + MODE_LABELS[s.mode] + '</span>' + incompleteBadge(s) + '</div>' +
         '<div class="total-time">' + formatTime(s.totalTime) + '</div>' +
       '</div>';
     el.appendChild(card);
@@ -1206,6 +1272,7 @@ function showSessionDetail(id) {
   let html = '<div class="card" style="text-align:center;margin-bottom:16px">' +
     '<div style="font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums">' + formatTime(s.totalTime) + '</div>' +
     '<div style="color:var(--text-dim)">' + escapeText(s.taskName) + ' / ' + MODE_LABELS[s.mode] + '</div>' +
+    (s.completed === false ? '<div style="color:var(--warn);font-size:0.8rem;margin-top:4px">途中終了（ベスト・成長グラフの対象外）</div>' : '') +
     '<div style="color:var(--text-dim);font-size:0.8rem">' + formatDate(s.date) + '</div>' +
     (s.memo ? '<div style="margin-top:8px;font-size:0.9rem">' + escapeText(s.memo) + '</div>' : '') +
     '</div>';
@@ -1234,9 +1301,8 @@ function deleteSession(id) {
   if (!confirm('このセッションを削除しますか？')) return;
   const sessions = getSessions().filter(s => s.id !== id);
   saveSessions(sessions);
-  const stats = getStats();
-  stats.totalSessions = Math.max(0, (stats.totalSessions || 0) - 1);
-  saveStats(stats);
+  // 削除した回がベストだった場合に備えて作り直す
+  recalcStats();
   showScreen('history');
 }
 
@@ -1263,8 +1329,11 @@ function renderAnalysis() {
   if (modeFilter) filtered = filtered.filter(s => s.mode === modeFilter);
   if (taskFilter) filtered = filtered.filter(s => s.taskName === taskFilter);
 
-  renderProgressChart(filtered);
-  renderBreakdownChart(filtered);
+  // 推移系グラフは完走した回のみ（途中終了が混ざると「急に速くなった」ように見えるため）
+  const trend = filtered.filter(s => s.completed !== false);
+  renderProgressChart(trend);
+  renderBreakdownChart(trend);
+  // 工程比較・評価分析は工程ごとの実測なので途中終了分も対象に含める
   renderCompare(filtered);
   renderRatingAnalysis(filtered);
 }
@@ -1619,9 +1688,7 @@ function importJSON(event) {
       const newSessions = (data.sessions || []).filter(s => !existingIds.has(s.id));
       saveSessions([...currentSessions, ...newSessions]);
       if (data.templates) saveTemplates(data.templates);
-      const stats = getStats();
-      stats.totalSessions = getSessions().length;
-      saveStats(stats);
+      recalcStats();
       alert(newSessions.length + '件のセッションをインポートしました');
       renderHome();
     } catch (err) {
@@ -1692,6 +1759,8 @@ function confirmResetAll() {
   localStorage.removeItem(STORAGE_KEYS.sessions);
   localStorage.removeItem(STORAGE_KEYS.templates);
   localStorage.removeItem(STORAGE_KEYS.stats);
+  // 中断中のセッションが残っていると削除後に復活するので一緒に消す
+  clearActiveSession();
   alert('全データを削除しました');
   renderHome();
 }
@@ -1816,7 +1885,8 @@ if (savedScreen) {
 } else {
   renderHome();
 }
-tryResumeSession();
+// ブラウザ標準のフォーム状態復元より後に走らせる（先に実行すると入力欄を空で上書きされる）
+window.addEventListener('load', tryResumeSession);
 </script>
 </body>
 </html>
