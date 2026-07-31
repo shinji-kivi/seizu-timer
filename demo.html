@@ -191,6 +191,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 /* スマホ横向き：横幅いっぱい＋全要素を縮めて1画面に収める */
 @media (max-height:500px) {
   .timer-total { font-size:clamp(3rem, 12vw, 8rem); letter-spacing:2px; }
+  .timer-pace { font-size:0.9rem; margin-top:2px; }
   .timer-middle { margin-top:6px; gap:10px; }
   .timer-step-info { padding:8px; }
   .timer-step-name { font-size:0.85rem; margin-bottom:4px; }
@@ -216,6 +217,13 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 .timer-step-time {
   font-size:2rem; font-variant-numeric:tabular-nums; font-weight:600;
 }
+/* 目標に対する累積の遅れ／貯金。工程単位の赤字だけだと全体でどれだけ押しているか分からないため */
+.timer-pace {
+  font-size:1.15rem; font-weight:600; font-variant-numeric:tabular-nums;
+  margin-top:6px; color:var(--text-dim); line-height:1;
+}
+.timer-pace.behind { color:var(--bad); }
+.timer-pace.ahead { color:var(--good); }
 .timer-step-time.over { color:var(--bad); }
 .timer-target { color:var(--text-dim); font-size:0.9rem; margin-top:4px; }
 .timer-next { color:var(--text-dim); font-size:0.85rem; }
@@ -232,8 +240,12 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   .lap-btn { aspect-ratio:1.618/1; }
 }
 .lap-btn:hover { filter:brightness(1.1); }
+/* 操作ボタンが3つ並ぶので、狭い画面でも文字が折り返さないよう左右の余白を詰める */
 .timer-controls .btn-outline,
-.timer-controls .btn-danger { display:flex; flex-direction:column; }
+.timer-controls .btn-danger {
+  display:flex; flex-direction:column;
+  padding-left:8px; padding-right:8px; font-size:0.95rem; min-width:0;
+}
 .timer-paused .timer-total { opacity:0.5; animation:blink 1s infinite; }
 @keyframes blink { 50% { opacity:0.2; } }
 
@@ -493,6 +505,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="timer-fullscreen">
     <div class="timer-display" id="timer-display">
       <div class="timer-total" id="timer-total">0:00:00</div>
+      <div class="timer-pace" id="timer-pace"></div>
       <div class="timer-middle">
         <div class="timer-step-info">
           <div class="timer-step-name" id="timer-step-name"></div>
@@ -506,6 +519,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <button class="btn lap-btn btn-block" id="btn-lap" onclick="lap()">次の工程へ &#9654;<br><span class="key-hint-inline">Enter</span></button>
     </div>
     <div class="timer-controls" style="margin-top:8px">
+      <button class="btn btn-outline" id="btn-undo" style="flex:1" onclick="undoLap()">1つ戻す<br><span class="key-hint-inline">BS</span></button>
       <button class="btn btn-outline" id="btn-pause" style="flex:1" onclick="togglePause()">一時停止<br><span class="key-hint-inline">Space</span></button>
       <button class="btn btn-danger" id="btn-finish" style="flex:1" onclick="finishSession()">終了</button>
     </div>
@@ -684,10 +698,13 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <h3 style="margin-bottom:12px">タイマー操作</h3>
     <div style="font-size:0.9rem;line-height:1.8">
       <p><strong>次の工程へ</strong>：現在の工程を記録して次へ進む</p>
+      <p><strong>1つ戻す</strong>：押し間違えたとき、直前のラップを取り消して前の工程に戻る</p>
       <p><strong>一時停止</strong>：タイマーを止める（再開で再スタート）</p>
       <p><strong>終了</strong>：最後の工程として記録し振り返りへ</p>
-      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">PCキーボード：Enter = 次の工程 / Space = 一時停止</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">PCキーボード：Enter = 次の工程 / Space = 一時停止 / BackSpace = 1つ戻す</p>
       <p style="color:var(--bad);font-size:0.85rem">工程タイマーが目標時間を超えると赤字表示</p>
+      <p style="margin-top:6px"><strong>遅れ / 貯金</strong>：累計タイムの下に、目標に対して何分押しているかを表示します。工程ごとの赤字と違い、<strong>全体でどれだけ遅れているか</strong>が分かるので、どこで巻くかの判断に使えます。</p>
+      <p style="color:var(--text-dim);font-size:0.85rem">計測中は画面が自動で消えないようにします（対応ブラウザのみ）。</p>
     </div>
   </div>
 
@@ -1063,8 +1080,40 @@ function tryResumeSession() {
     showScreen('timer');
     renderTimerUI();
     timerState.intervalId = setInterval(timerTick, 100);
+    ensureWakeLock();
   } catch { clearActiveSession(); }
 }
+
+// ========================================
+// 4.5 画面スリープ防止
+// ========================================
+// 計測中に画面が消えると、解除してからでないとラップを押せない。
+// 端末側の自動ロック設定に頼らず、計測中だけ画面を保持する。
+// 非対応ブラウザ（iOS 16.3 以前など）では何も起きないだけで害はない
+let wakeLock = null;
+
+async function ensureWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock || !timerState.running) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    // タブを離れる等で自動解除されたら、次の操作で取り直せるようにする
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (e) {
+    wakeLock = null;
+  }
+}
+
+function releaseWakeLock() {
+  if (!wakeLock) return;
+  const lock = wakeLock;
+  wakeLock = null;
+  lock.release().catch(() => {});
+}
+
+// 画面に戻ってきたときは自動解除されているので取り直す
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') ensureWakeLock();
+});
 
 function startSession() {
   const taskName = document.getElementById('setup-task').value.trim();
@@ -1082,6 +1131,7 @@ function startSession() {
   renderTimerUI();
   timerState.intervalId = setInterval(timerTick, 100);
   saveActiveSession();
+  ensureWakeLock();
 }
 
 let lastTickTime = 0;
@@ -1098,9 +1148,36 @@ function timerTick() {
   if (now - lastSaveTime > 5000) { lastSaveTime = now; saveActiveSession(); }
 }
 
+// 目標に対して今どれだけ押している（貯金がある）か。
+// 完了した工程の実績−目標に、現在工程の超過分を足す。
+// 完了していない工程の「まだ余っている時間」は貯金に数えない（先取りできないため）
+function computePaceDiff() {
+  let doneTarget = 0, doneActual = 0;
+  timerState.laps.forEach(l => { doneTarget += l.targetTime; doneActual += l.actualTime; });
+  const cur = timerState.steps[timerState.currentStep];
+  const over = cur ? Math.max(0, timerState.stepElapsed - cur.targetTime) : 0;
+  return (doneActual - doneTarget) + over;
+}
+
+function updatePaceDisplay() {
+  const el = document.getElementById('timer-pace');
+  const diff = computePaceDiff();
+  if (Math.abs(diff) < 1) {
+    el.textContent = '目標どおり';
+    el.className = 'timer-pace';
+  } else if (diff > 0) {
+    el.textContent = '遅れ +' + formatTimeMM(diff);
+    el.className = 'timer-pace behind';
+  } else {
+    el.textContent = '貯金 ' + formatTimeMM(-diff);
+    el.className = 'timer-pace ahead';
+  }
+}
+
 function updateTimerDisplay() {
   const el = (id) => document.getElementById(id);
   el('timer-total').textContent = formatTime(timerState.totalElapsed);
+  updatePaceDisplay();
   const step = timerState.steps[timerState.currentStep];
   if (!step) return;
   el('timer-step-name').textContent = step.name;
@@ -1129,7 +1206,19 @@ function renderTimerUI() {
   updatePauseUI();
   const lapLabel = timerState.currentStep < timerState.steps.length - 1 ? '次の工程へ \u25B6' : '完了 \u2713';
   document.getElementById('btn-lap').innerHTML = lapLabel + '<br><span class="key-hint-inline">Enter</span>';
+  document.getElementById('btn-undo').disabled = timerState.laps.length === 0;
   updateTimerDisplay();
+}
+
+// ラップの押し間違いを取り消す。
+// 誤って進めてから今までの時間は前の工程のものなので、実績に足し戻す（累計は動かさない）
+function undoLap() {
+  if (!timerState.running || timerState.laps.length === 0) return;
+  const last = timerState.laps.pop();
+  timerState.currentStep = Math.max(0, timerState.currentStep - 1);
+  timerState.stepElapsed += last.actualTime;
+  renderTimerUI();
+  saveActiveSession();
 }
 
 function lap() {
@@ -1143,6 +1232,7 @@ function lap() {
     memo: ''
   });
   timerState.stepElapsed = 0;
+  ensureWakeLock();
   if (timerState.currentStep < timerState.steps.length - 1) {
     timerState.currentStep++;
     renderTimerUI();
@@ -1165,6 +1255,7 @@ function togglePause() {
 function finishSession(isComplete) {
   timerState.running = false;
   timerState.completed = !!isComplete;
+  releaseWakeLock();
   if (timerState.intervalId) { clearInterval(timerState.intervalId); timerState.intervalId = null; }
   if (timerState.currentStep < timerState.steps.length &&
       timerState.laps.length <= timerState.currentStep) {
@@ -1194,6 +1285,21 @@ function renderReview() {
   infoEl.style.cssText = 'color:var(--text-dim);margin-top:4px';
   infoEl.textContent = timerState.taskName + ' / ' + MODE_LABELS[timerState.mode];
   summary.appendChild(infoEl);
+
+  // 計測した工程ぶんの目標合計と、それに対する過不足
+  const targetTotal = timerState.laps.reduce((a, l) => a + l.targetTime, 0);
+  const diff = timerState.totalElapsed - targetTotal;
+  const paceEl = document.createElement('div');
+  paceEl.style.cssText = 'margin-top:6px;font-size:0.9rem;font-variant-numeric:tabular-nums';
+  if (Math.abs(diff) < 1) {
+    paceEl.textContent = '目標 ' + formatTime(targetTotal) + '（目標どおり）';
+    paceEl.style.color = 'var(--text-dim)';
+  } else {
+    paceEl.textContent = '目標 ' + formatTime(targetTotal) +
+      '（' + (diff > 0 ? '遅れ +' : '貯金 ') + formatTimeMM(Math.abs(diff)) + '）';
+    paceEl.style.color = diff > 0 ? 'var(--bad)' : 'var(--good)';
+  }
+  summary.appendChild(paceEl);
 
   const sessions = getSessions().filter(s => s.mode === timerState.mode);
   const avgMap = {};
@@ -1335,6 +1441,7 @@ async function handleSaveFailure(session) {
 
 function discardSession() {
   clearActiveSession();
+  releaseWakeLock();
   timerState.running = false;
   if (timerState.intervalId) { clearInterval(timerState.intervalId); timerState.intervalId = null; }
   showScreen('home');
@@ -2041,6 +2148,9 @@ document.addEventListener('keydown', function(e) {
   } else if (e.key === ' ') {
     e.preventDefault();
     togglePause();
+  } else if (e.key === 'Backspace') {
+    e.preventDefault();
+    undoLap();
   }
 });
 

@@ -396,23 +396,30 @@ footer a { color: var(--accent); text-decoration: none; }
       <h3>画面の見方</h3>
       <ul>
         <li>大きな数字：経過時間（合計）</li>
+        <li><strong>遅れ / 貯金</strong>：目標に対して全体で何分押しているか。赤字なら遅れ、緑なら貯金</li>
         <li>現在の工程名と工程タイマー</li>
         <li>目標時間（目標を超えると赤字表示）</li>
         <li>次の工程名</li>
       </ul>
+      <div class="tip">工程ごとの赤字は「その工程が超過したか」しか分かりません。<strong>遅れ / 貯金</strong>は完了した工程の実績と目標の差を積み上げた値なので、<strong>全体でどれだけ押しているか</strong>が一目で分かります。どこで巻くかの判断に使ってください。まだ終わっていない工程の余り時間は貯金に数えません（先取りできないため）。</div>
     </div>
     <div class="card">
       <h3>ボタン操作</h3>
       <ul>
         <li><span class="tag tag-accent">次の工程へ</span> 現在の工程を記録して次へ進む。最終工程では「完了」と表示され、押すと振り返りへ。</li>
+        <li><span class="tag">1つ戻す</span> 押し間違えたとき、直前のラップを取り消して前の工程に戻る。誤って進めてからの時間は前の工程に足し戻されるので、合計はずれません。</li>
         <li><span class="tag">一時停止</span> タイマーを一時停止。再度押すと再開。</li>
         <li><span class="tag tag-bad">終了</span> 現在の工程を最後として振り返りへ進む。</li>
       </ul>
-      <div class="tip">PCキーボードショートカット：<span class="kbd">Enter</span> = 次の工程 ／ <span class="kbd">Space</span> = 一時停止</div>
+      <div class="tip">PCキーボードショートカット：<span class="kbd">Enter</span> = 次の工程 ／ <span class="kbd">Space</span> = 一時停止 ／ <span class="kbd">BackSpace</span> = 1つ戻す</div>
+    </div>
+    <div class="card">
+      <h3>画面のスリープ</h3>
+      <p>計測中は、画面が自動で消えないようにします（対応ブラウザのみ）。端末側の自動ロック設定を変える必要はありません。うまく効かない場合は、端末の設定で自動ロックを一時的にオフにしてください。</p>
     </div>
     <div class="card">
       <h3>リロード・中断について</h3>
-      <p>計測中にページをリロードしても、タイマーは自動的に復元されます（一時停止状態で再開）。</p>
+      <p>計測中にページをリロードしても、タイマーは自動的に復元されます。一時停止していた場合は、停止したままの状態で復元されます。</p>
     </div>
   </section>
 
