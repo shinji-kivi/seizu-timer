@@ -768,7 +768,29 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <h3 style="margin-bottom:8px">免責</h3>
     <p style="font-size:0.9rem;color:var(--text-dim);line-height:1.6">工程と目標時間は練習の目安です。試験の結果を保証するものではありません。本ツールの利用によって生じた不利益について、作者は責任を負いません（MIT License）。</p>
   </div>
+  <div class="card" id="help-changelog">
+    <h3 style="margin-bottom:12px">更新履歴</h3>
+    <div style="font-size:0.9rem;line-height:1.7">
+      <p><strong>v1.1.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-07-31</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
+        <p>・目標に対する「遅れ / 貯金」を計測画面に表示</p>
+        <p>・ラップの押し間違いを「1つ戻す」で取り消せるように</p>
+        <p>・計測中は画面が自動で消えないように</p>
+        <p>・ホーム画面に追加してアプリとして使えるように（オフライン対応）</p>
+        <p>・記録の保存に失敗したとき、その場でファイルに書き出せるように</p>
+        <p>・途中で終了した回はベストタイム・成長グラフの対象外に</p>
+        <p>・振り返り画面でページを閉じても記録が残るように</p>
+        <p>・文字のピンチズームができるように</p>
+      </div>
+      <p><strong>v1.0.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-03-28</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 0 12px">
+        <p>・公開（工程ごとの計測・振り返り・履歴・分析・工程カスタマイズ・バックアップ）</p>
+      </div>
+    </div>
+  </div>
+
   <a class="btn btn-outline btn-block" href="help.html" target="_blank" rel="noopener" style="margin-top:4px">詳細ガイドを開く（別ページ）</a>
+  <p style="text-align:center;color:var(--text-dim);font-size:0.8rem;margin-top:12px" id="help-version"></p>
 </div>
 
 <!-- ===== FEEDBACK ===== -->
@@ -821,8 +843,21 @@ const STORAGE_KEYS = {
   templates: 'seizu_templates',
   stats: 'seizu_stats',
   activeSession: 'seizu_active_session',
-  introSeen: 'seizu_intro_seen'
+  introSeen: 'seizu_intro_seen',
+  lastVersion: 'seizu_last_version'
 };
+
+// バージョン。更新履歴(ヘルプ画面)と help.html の表記も合わせて更新すること
+const APP_VERSION = '1.1.0';
+const APP_VERSION_DATE = '2026-07-31';
+
+// 更新後に1回だけ出す案内の本文。利用者から見て何が変わったかだけを書く
+const UPDATE_HIGHLIGHTS =
+  '・目標に対する「遅れ / 貯金」を計測画面に表示\n' +
+  '・ラップの押し間違いを「1つ戻す」で取り消せるように\n' +
+  '・計測中は画面が自動で消えないように\n' +
+  '・ホーム画面に追加してアプリとして使えるように（オフライン対応）\n' +
+  '・記録の保存に失敗したとき、その場でファイルに書き出せるように';
 
 // ========================================
 // 1.5 Dialog (alert / confirm の置き換え)
@@ -2159,6 +2194,7 @@ document.addEventListener('keydown', function(e) {
 // Init
 // ========================================
 loadThemeColor();
+document.getElementById('help-version').textContent = 'v' + APP_VERSION + '（' + APP_VERSION_DATE + '）';
 const savedScreen = localStorage.getItem('seizu_screen');
 if (savedScreen) {
   showScreen(savedScreen);
@@ -2186,25 +2222,47 @@ if (navigator.storage && navigator.storage.persist) {
     .catch(() => {});
 }
 
-// 初めて開いた人向けの案内。SNS 等から来て前提を知らない人が
-// 何のツールか分からないまま離脱しないようにする
-async function showIntroIfFirstVisit() {
-  if (localStorage.getItem(STORAGE_KEYS.introSeen)) return;
-  writeStorage(STORAGE_KEYS.introSeen, '1');
-  if (getSessions().length > 0) return;
+// 起動時の案内。初回は「何のツールか」、更新後は「何が変わったか」を1回だけ出す。
+// PWA は黙って自動更新されるので、知らせないと新機能に気づかれない
+async function showStartupNotice() {
+  const introSeen = localStorage.getItem(STORAGE_KEYS.introSeen);
+  const lastVersion = localStorage.getItem(STORAGE_KEYS.lastVersion);
+  writeStorage(STORAGE_KEYS.lastVersion, APP_VERSION);
+
+  // 初めて開いた人。SNS 等から来て前提を知らない人が離脱しないように
+  if (!introSeen) {
+    writeStorage(STORAGE_KEYS.introSeen, '1');
+    if (getSessions().length > 0) return;
+    const openHelp = await askConfirm(
+      '一級建築士 製図試験（6時間30分）の練習用タイマーです。\n\n' +
+      '工程ごとに「次の工程へ」を押してラップを取ると、目標時間との差と、回を重ねたときの成長が記録されます。\n\n' +
+      '記録はこの端末の中だけに保存され、外部には送信されません。無料で、登録も不要です。',
+      '使い方を見る', '製図時間管理ツール', 'はじめる');
+    if (openHelp) showScreen('help');
+    return;
+  }
+
+  // バージョンを記録し始める前から使っている人も更新案内の対象にする
+  const prev = lastVersion || '1.0.0';
+  if (prev === APP_VERSION) return;
   const openHelp = await askConfirm(
-    '一級建築士 製図試験（6時間30分）の練習用タイマーです。\n\n' +
-    '工程ごとに「次の工程へ」を押してラップを取ると、目標時間との差と、回を重ねたときの成長が記録されます。\n\n' +
-    '記録はこの端末の中だけに保存され、外部には送信されません。無料で、登録も不要です。',
-    '使い方を見る', '製図時間管理ツール', 'はじめる');
-  if (openHelp) showScreen('help');
+    'v' + APP_VERSION + ' に更新しました。\n\n' + UPDATE_HIGHLIGHTS,
+    '更新内容を見る', 'アップデート', '閉じる');
+  if (openHelp) openHelpAt('help-changelog');
+}
+
+// ヘルプ画面を開いて指定の見出しまでスクロールする
+function openHelpAt(id) {
+  showScreen('help');
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ block: 'start' }), 0);
 }
 
 window.addEventListener('load', () => {
   // ブラウザ標準のフォーム状態復元より後に走らせる（先に実行すると入力欄を空で上書きされる）
   tryResumeSession();
   // 計測中・振り返り中に復帰したときは案内を割り込ませない
-  if (currentScreen !== 'timer' && currentScreen !== 'review') showIntroIfFirstVisit();
+  if (currentScreen !== 'timer' && currentScreen !== 'review') showStartupNotice();
 
   // PWA: Service Worker を登録してオフライン動作を有効にする。
   // デモ版は本番のキャッシュを汚さないよう登録しない。file:// では登録できないので握りつぶす
