@@ -385,6 +385,16 @@ footer a { color: var(--accent); text-decoration: none; }
       </div>
       <div class="tip">モードを変えると工程一覧と目標時間が切り替わります。工程は設定画面でカスタマイズ可能です。</div>
     </div>
+    <div class="card">
+      <h3>本番の開始時刻（任意）</h3>
+      <p>本番の試験開始時刻を設定すると、計測中の経過時間を<strong>実時刻に換算</strong>して表示します。本試験が11:00開始なら、既定の 11:00 のままで構いません。</p>
+      <ul>
+        <li>工程一覧に、その工程を<strong>終えているべき時刻</strong>が並びます</li>
+        <li>合計時間から逆算した<strong>終了予定時刻</strong>が出ます</li>
+        <li>空欄にすると、実時刻の表示をしません</li>
+      </ul>
+      <div class="tip">設定した時刻は次回以降も引き継がれます。エスキスのみ・作図のみのモードでも使えるので、「14:00から作図だけ通す」のような練習でも本番と同じ時間帯の感覚を作れます。</div>
+    </div>
   </section>
 
   <!-- 4. Timer -->
@@ -398,6 +408,7 @@ footer a { color: var(--accent); text-decoration: none; }
       <ul>
         <li>大きな数字：経過時間（合計）</li>
         <li><strong>遅れ / 貯金</strong>：目標に対して全体で何分押しているか。赤字なら遅れ、緑なら貯金</li>
+        <li><strong>本番なら 15:42 ・ 残り 1時間48分（終了 17:30）</strong>：開始時刻を設定したときだけ表示。制限時間を超えると赤字になります</li>
         <li>現在の工程名と工程タイマー</li>
         <li>目標時間（目標を超えると赤字表示）</li>
         <li>次の工程名</li>
@@ -551,6 +562,15 @@ footer a { color: var(--accent); text-decoration: none; }
       <h2>更新履歴</h2>
     </div>
     <div class="card">
+      <h3>v1.2.0 &mdash; 2026-08-08</h3>
+      <ul>
+        <li><strong>本番の開始時刻</strong>を設定できるようにしました（セッション設定）</li>
+        <li>計測中に<strong>「本番なら今 15:42」</strong>と実時刻に換算して表示するようにしました</li>
+        <li><strong>残り時間と終了予定時刻</strong>を表示するようにしました</li>
+        <li>工程一覧に、その工程を<strong>終えているべき時刻</strong>を表示するようにしました</li>
+      </ul>
+    </div>
+    <div class="card">
       <h3>v1.1.0 &mdash; 2026-07-31</h3>
       <ul>
         <li>目標に対する<strong>「遅れ / 貯金」</strong>を計測画面に表示するようにしました。全体でどれだけ押しているかが一目で分かります</li>
@@ -573,7 +593,7 @@ footer a { color: var(--accent); text-decoration: none; }
 
   <footer>
     <p>製図時間管理ツール &mdash; 一級建築士製図試験用</p>
-    <p style="margin-top:4px">v1.1.0（2026-07-31）</p>
+    <p style="margin-top:4px">v1.2.0（2026-08-08）</p>
     <p style="margin-top:6px"><a href="index.html">アプリを開く</a> &nbsp;|&nbsp; <a href="https://github.com/shinji-kivi/seizu-timer" target="_blank" rel="noopener">GitHub</a></p>
   </footer>
 

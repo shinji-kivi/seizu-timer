@@ -224,6 +224,17 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 }
 .timer-pace.behind { color:var(--bad); }
 .timer-pace.ahead { color:var(--good); }
+/* 本番の開始時刻を設定したときだけ出る、実時刻換算と残り時間 */
+.timer-clock {
+  font-size:0.95rem; font-variant-numeric:tabular-nums;
+  margin-top:6px; color:var(--text-dim); line-height:1;
+}
+.timer-clock.over { color:var(--bad); }
+/* スマホ横向き。上の @media (max-height:500px) ブロックはこの規則より前にあり、
+   同じ詳細度なので後勝ちで打ち消されてしまう。ここに置いて効かせる */
+@media (max-height:500px) {
+  .timer-clock { font-size:0.75rem; margin-top:2px; }
+}
 .timer-step-time.over { color:var(--bad); }
 .timer-target { color:var(--text-dim); font-size:0.9rem; margin-top:4px; }
 .timer-next { color:var(--text-dim); font-size:0.85rem; }
@@ -491,6 +502,11 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     </select>
   </div>
   <div class="form-group">
+    <label>本番の開始時刻（任意）</label>
+    <input type="time" id="setup-clock" value="11:00" oninput="updateSetupPreview()">
+    <p style="color:var(--text-dim);font-size:0.85rem;margin-top:6px">設定すると、計測中に「本番なら今 15:42」と実時刻に換算して表示します。空欄にすると表示しません。</p>
+  </div>
+  <div class="form-group">
     <label>メモ（任意）</label>
     <textarea id="setup-memo" placeholder="メモを入力..."></textarea>
   </div>
@@ -506,6 +522,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <div class="timer-display" id="timer-display">
       <div class="timer-total" id="timer-total">0:00:00</div>
       <div class="timer-pace" id="timer-pace"></div>
+      <div class="timer-clock" id="timer-clock"></div>
       <div class="timer-middle">
         <div class="timer-step-info">
           <div class="timer-step-name" id="timer-step-name"></div>
@@ -690,7 +707,12 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
         <p>作図のみ：作図・断面図のみ</p>
         <p>記述のみ：計画の要点のみ</p>
       </div>
-      <p style="margin-top:4px"><strong>③ 計測開始</strong>を押す</p>
+      <p style="margin-top:4px"><strong>③ 本番の開始時刻</strong>を設定（任意）</p>
+      <div style="margin-left:12px;color:var(--text-dim);font-size:0.85rem">
+        <p>本番が11:00開始なら 11:00 のままでOK。工程一覧に「その工程を終えているべき時刻」が出ます</p>
+        <p>空欄にすると実時刻の表示をしません</p>
+      </div>
+      <p style="margin-top:4px"><strong>④ 計測開始</strong>を押す</p>
     </div>
   </div>
 
@@ -704,6 +726,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">PCキーボード：Enter = 次の工程 / Space = 一時停止 / BackSpace = 1つ戻す</p>
       <p style="color:var(--bad);font-size:0.85rem">工程タイマーが目標時間を超えると赤字表示</p>
       <p style="margin-top:6px"><strong>遅れ / 貯金</strong>：累計タイムの下に、目標に対して何分押しているかを表示します。工程ごとの赤字と違い、<strong>全体でどれだけ遅れているか</strong>が分かるので、どこで巻くかの判断に使えます。</p>
+      <p style="margin-top:6px"><strong>本番なら 15:42</strong>：開始時刻を設定していると、経過時間を本番の実時刻に換算して表示します。あわせて<strong>残り時間と終了予定時刻</strong>も出るので、「あと何分あるか」を頭の中で計算しなくて済みます。</p>
       <p style="color:var(--text-dim);font-size:0.85rem">計測中は画面が自動で消えないようにします（対応ブラウザのみ）。</p>
     </div>
   </div>
@@ -770,6 +793,13 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card" id="help-changelog">
     <h3 style="margin-bottom:12px">更新履歴</h3>
     <div style="font-size:0.9rem;line-height:1.7">
+      <p><strong>v1.2.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-08-08</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
+        <p>・本番の開始時刻を設定できるように</p>
+        <p>・計測中に「本番なら今 15:42」と実時刻で表示</p>
+        <p>・残り時間と終了予定時刻を表示</p>
+        <p>・工程一覧に、その工程を終えているべき時刻を表示</p>
+      </div>
       <p><strong>v1.1.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-07-31</span></p>
       <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
         <p>・目標に対する「遅れ / 貯金」を計測画面に表示</p>
@@ -843,20 +873,19 @@ const STORAGE_KEYS = {
   stats: 'demo_seizu_stats',
   activeSession: 'demo_seizu_active_session',
   introSeen: 'demo_seizu_intro_seen',
-  lastVersion: 'demo_seizu_last_version'
+  lastVersion: 'demo_seizu_last_version',
+  clockStart: 'demo_seizu_clock_start'
 };
 
 // バージョン。更新履歴(ヘルプ画面)と help.html の表記も合わせて更新すること
-const APP_VERSION = '1.1.0';
-const APP_VERSION_DATE = '2026-07-31';
+const APP_VERSION = '1.2.0';
+const APP_VERSION_DATE = '2026-08-08';
 
 // 更新後に1回だけ出す案内の本文。利用者から見て何が変わったかだけを書く
 const UPDATE_HIGHLIGHTS =
-  '・目標に対する「遅れ / 貯金」を計測画面に表示\n' +
-  '・ラップの押し間違いを「1つ戻す」で取り消せるように\n' +
-  '・計測中は画面が自動で消えないように\n' +
-  '・ホーム画面に追加してアプリとして使えるように（オフライン対応）\n' +
-  '・記録の保存に失敗したとき、その場でファイルに書き出せるように';
+  '・本番の開始時刻を設定すると、計測中に「本番なら今 15:42」と実時刻で表示されます\n' +
+  '・制限時間に対する残り時間と、終了予定時刻も分かるようになりました\n' +
+  '・工程一覧にも、その工程を終えているべき時刻が出ます';
 
 // ========================================
 // 1.5 Dialog (alert / confirm の置き換え)
@@ -1056,7 +1085,8 @@ let timerState = {
   totalElapsed: 0,
   stepElapsed: 0,
   intervalId: null,
-  laps: []
+  laps: [],
+  clockStart: null   // 本番の開始時刻（0時からの分数）。null なら実時刻換算を出さない
 };
 
 
@@ -1070,6 +1100,7 @@ function saveActiveSession(phase) {
     steps: timerState.steps, currentStep: timerState.currentStep,
     totalElapsed: timerState.totalElapsed, stepElapsed: timerState.stepElapsed,
     laps: timerState.laps, paused: timerState.paused,
+    clockStart: timerState.clockStart,
     completed: !!timerState.completed,
     savedAt: Date.now()
   };
@@ -1094,6 +1125,7 @@ function tryResumeSession() {
         steps: data.steps, currentStep: data.currentStep,
         totalElapsed: data.totalElapsed, stepElapsed: 0,
         intervalId: null, laps: data.laps || [],
+        clockStart: typeof data.clockStart === 'number' ? data.clockStart : null,
         completed: !!data.completed
       };
       showScreen('review');
@@ -1110,7 +1142,8 @@ function tryResumeSession() {
       steps: data.steps, currentStep: data.currentStep,
       totalElapsed: data.totalElapsed + elapsed,
       stepElapsed: data.stepElapsed + elapsed,
-      intervalId: null, laps: data.laps
+      intervalId: null, laps: data.laps,
+      clockStart: typeof data.clockStart === 'number' ? data.clockStart : null
     };
     showScreen('timer');
     renderTimerUI();
@@ -1156,11 +1189,15 @@ function startSession() {
   const memo = document.getElementById('setup-memo').value.trim();
   if (!taskName) { document.getElementById('task-error').style.display='block'; document.getElementById('setup-task').focus(); return; }
   const templates = getTemplates();
+  const clockRaw = document.getElementById('setup-clock').value;
+  // 次回も同じ開始時刻から始めることが多いので覚えておく（保存に失敗しても計測は続ける）
+  writeStorage(STORAGE_KEYS.clockStart, clockRaw);
   timerState = {
     running: true, paused: false, mode, taskName, memo,
     steps: JSON.parse(JSON.stringify(templates[mode])),
     currentStep: 0, totalElapsed: 0, stepElapsed: 0,
-    intervalId: null, laps: [], completed: false
+    intervalId: null, laps: [], completed: false,
+    clockStart: parseClockInput(clockRaw)
   };
   showScreen('timer');
   renderTimerUI();
@@ -1209,10 +1246,32 @@ function updatePaceDisplay() {
   }
 }
 
+// 本番の開始時刻が設定されているときだけ、経過時間を実時刻に換算して出す。
+// 残り時間は工程の目標時間の合計（＝そのモードの制限時間）から引く
+function updateClockDisplay() {
+  const el = document.getElementById('timer-clock');
+  if (timerState.clockStart === null || timerState.clockStart === undefined) {
+    el.textContent = '';
+    el.className = 'timer-clock';
+    return;
+  }
+  const limit = timerState.steps.reduce((a, s) => a + s.targetTime, 0);
+  const remain = limit - timerState.totalElapsed;
+  const now = timerState.clockStart + timerState.totalElapsed / 60;
+  const end = timerState.clockStart + limit / 60;
+  const remainText = remain >= 0
+    ? '残り ' + formatDuration(remain)
+    : '超過 ' + formatDuration(-remain);
+  el.textContent = '本番なら ' + formatClock(now) + ' ・ ' + remainText +
+    '（終了 ' + formatClock(end) + '）';
+  el.className = 'timer-clock' + (remain < 0 ? ' over' : '');
+}
+
 function updateTimerDisplay() {
   const el = (id) => document.getElementById(id);
   el('timer-total').textContent = formatTime(timerState.totalElapsed);
   updatePaceDisplay();
+  updateClockDisplay();
   const step = timerState.steps[timerState.currentStep];
   if (!step) return;
   el('timer-step-name').textContent = step.name;
@@ -2098,6 +2157,20 @@ function formatTimeMM(sec) {
   const s = sec % 60;
   return m + ':' + String(s).padStart(2, '0');
 }
+// "11:00" → 660（0時からの分数）。空欄・不正値は null を返す（＝実時刻換算オフ）
+function parseClockInput(value) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec((value || '').trim());
+  if (!m) return null;
+  const h = Number(m[1]), min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+// 0時からの分数 → "15:42"。日付をまたいでも 24 で折り返して表示する
+function formatClock(minutes) {
+  const total = ((Math.floor(minutes) % 1440) + 1440) % 1440;
+  return String(Math.floor(total / 60)).padStart(2, '0') + ':' +
+    String(total % 60).padStart(2, '0');
+}
 // 目標時間の総量を読みやすく（「6時間30分」「45分」）。390:00 のような表記を避けるため
 function formatDuration(sec) {
   const totalMin = Math.round(sec / 60);
@@ -2148,25 +2221,40 @@ function generateColors(n) {
 // ========================================
 // 13. Setup Preview
 // ========================================
+// 前回使った本番の開始時刻を復元する。未保存なら HTML の既定値（11:00）のまま
+function restoreClockStart() {
+  const saved = localStorage.getItem(STORAGE_KEYS.clockStart);
+  if (saved === null) return;
+  document.getElementById('setup-clock').value = saved;
+}
+
 function updateSetupPreview() {
   const mode = document.getElementById('setup-mode').value;
   const templates = getTemplates();
   const steps = templates[mode];
   const el = document.getElementById('setup-preview');
   const total = steps.reduce((a,s) => a + s.targetTime, 0);
+  const clockStart = parseClockInput(document.getElementById('setup-clock').value);
   // 課題名サジェスチョン更新
   const dl = document.getElementById('task-suggestions');
   const names = [...new Set(getSessions().map(s => s.taskName).filter(Boolean))];
   dl.innerHTML = names.map(n => '<option value="' + escapeAttr(n) + '">').join('');
   let html = '<div style="font-weight:600;margin-bottom:8px">工程一覧（合計 ' + formatDuration(total) + '）</div>';
+  if (clockStart !== null) {
+    html += '<div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:8px">' +
+      formatClock(clockStart) + ' 開始 → ' + formatClock(clockStart + total / 60) + ' 終了予定</div>';
+  }
   let cumulative = 0;
   steps.forEach((s, i) => {
     cumulative += s.targetTime;
     // 各工程は m:ss、累計は h:mm:ss（ホームのベストタイム表示と単位を揃える）
+    // 開始時刻を設定していれば、その工程を終えているべき実時刻も添える
+    const clockText = clockStart === null ? '' :
+      ' ' + formatClock(clockStart + cumulative / 60);
     html += '<div style="display:flex;justify-content:space-between;font-size:0.85rem;padding:3px 0;border-bottom:1px solid var(--border)">' +
       '<span>' + escapeText((i+1) + '. ' + s.name) + '</span>' +
       '<span style="font-variant-numeric:tabular-nums;color:var(--text-dim)">' +
-        formatTimeMM(s.targetTime) + ' (' + formatTime(cumulative) + ')</span></div>';
+        formatTimeMM(s.targetTime) + ' (' + formatTime(cumulative) + ')' + clockText + '</span></div>';
   });
   el.innerHTML = html;
 }
@@ -2231,6 +2319,7 @@ function generateDemoData() {
 }
 
 loadThemeColor();
+restoreClockStart();
 document.getElementById('help-version').textContent = 'v' + APP_VERSION + '（' + APP_VERSION_DATE + '）';
 generateDemoData();
 const savedScreen = localStorage.getItem('demo_seizu_screen');
