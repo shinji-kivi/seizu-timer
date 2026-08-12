@@ -64,7 +64,7 @@
 
 **記録はお使いの端末のブラウザ内（localStorage）にのみ保存されます。外部への送信は一切ありません。** サーバーもアカウントもありません。
 
-そのため、次の場合は記録が消えます。**設定 → データ管理 → エクスポート**で定期的にバックアップ（JSONファイル）を取ってください。
+そのため、次の場合は記録が消えます。**設定 → データ管理 → エクスポート**で定期的にバックアップ（JSONファイル）を取ってください。前回のバックアップから記録が10件たまると、ホーム画面でお知らせします。
 
 - ブラウザの閲覧データ（Cookie・サイトデータ）を削除したとき
 - プライベートブラウズで使ったとき
@@ -121,7 +121,7 @@ src = src.replace('<title>製図時間管理ツール</title>', '<title>製図�
 src = src.replace('<link rel="manifest" href="manifest.json">\n', '')   # デモはインストール対象外
 for k in ['seizu_sessions','seizu_templates','seizu_stats','seizu_active_session',
           'seizu_screen','seizu_theme_color','seizu_intro_seen','seizu_last_version',
-          'seizu_clock_start']:
+          'seizu_clock_start','seizu_backup_at']:
     src = src.replace("'%s'" % k, "'demo_%s'" % k)
 
 anchor_fn = '\nloadThemeColor();\n'

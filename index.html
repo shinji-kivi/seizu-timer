@@ -83,7 +83,9 @@ body {
 #screen-home {
   display:none; height:100vh; height:100dvh;
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
-  overflow:hidden; box-sizing:border-box;
+  /* 収まる想定の固定レイアウトだが、万一溢れても操作不能にならないよう縦スクロールは許す
+     （バックアップの案内など、状況によって増える要素があるため） */
+  overflow-x:hidden; overflow-y:auto; box-sizing:border-box;
 }
 #screen-home.active {
   display:flex; flex-direction:column; justify-content:center;
@@ -350,6 +352,21 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 .home-title { text-align:center; margin:12px 0 12px; }
 @media (max-height:700px) { .home-title { margin:4px 0 8px; } }
 
+/* バックアップの案内。警告色ではなく穏やかな見た目にする（不具合ではないため）。
+   ホーム画面は 100dvh の固定レイアウトなので、背を詰めて他の要素を押し出さないこと */
+.backup-notice {
+  background:var(--bg-card); border:1px solid var(--warn); border-radius:var(--radius);
+  padding:10px 12px; margin-bottom:10px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.backup-notice-text { font-size:0.8rem; line-height:1.5; flex:1; min-width:150px; }
+.backup-notice-actions { display:flex; gap:6px; flex-shrink:0; }
+.backup-notice-actions .btn { padding:7px 12px; font-size:0.8rem; line-height:1.2; }
+@media (max-height:700px) {
+  .backup-notice { padding:8px 10px; margin-bottom:8px; }
+  .backup-notice-text { font-size:0.75rem; }
+}
+
 /* Home stats */
 .home-stats {
   display:flex; gap:12px; flex-wrap:wrap;
@@ -456,6 +473,13 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <h1 style="font-size:1.4rem;">製図時間管理ツール</h1>
     <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">一級建築士 製図試験</p>
     <a href="help.html" target="_blank" rel="noopener" style="position:absolute;top:0;right:0;background:none;border:1px solid var(--border);border-radius:50%;width:32px;height:32px;color:var(--text-dim);font-size:0.9rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;text-decoration:none">?</a>
+  </div>
+  <div id="backup-notice" class="backup-notice" style="display:none">
+    <div class="backup-notice-text" id="backup-notice-text"></div>
+    <div class="backup-notice-actions">
+      <button class="btn btn-primary btn-sm" onclick="backupFromNotice()">バックアップを取る</button>
+      <button class="btn btn-outline btn-sm" onclick="dismissBackupNotice()">あとで</button>
+    </div>
   </div>
   <div class="home-stats" id="home-stats"></div>
   <div id="home-active-templates" style="display:none;color:var(--text-dim);font-size:0.8rem;margin-top:8px;text-align:center"></div>
@@ -825,7 +849,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card">
     <h3 style="margin-bottom:8px">データについて</h3>
     <p style="font-size:0.9rem;color:var(--text-dim);line-height:1.6">すべてのデータはこの端末のブラウザ（localStorage）にのみ保存されます。外部への送信はありません。</p>
-    <p style="font-size:0.9rem;color:var(--bad);line-height:1.6;margin-top:8px">次の場合は記録が消えます。<strong>設定 → データ管理 → エクスポート</strong>で定期的にバックアップを取ってください。</p>
+    <p style="font-size:0.9rem;color:var(--bad);line-height:1.6;margin-top:8px">次の場合は記録が消えます。<strong>設定 → データ管理 → エクスポート</strong>で定期的にバックアップを取ってください。記録が10件たまるごとに、ホーム画面でもお知らせします。</p>
     <div style="font-size:0.85rem;color:var(--text-dim);line-height:1.7;margin-top:4px">
       <p>・ブラウザの閲覧データ（Cookie・サイトデータ）を削除したとき</p>
       <p>・プライベートブラウズで使ったとき</p>
@@ -841,6 +865,11 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card" id="help-changelog">
     <h3 style="margin-bottom:12px">更新履歴</h3>
     <div style="font-size:0.9rem;line-height:1.7">
+      <p><strong>v1.4.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-08-12</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
+        <p>・記録が10件たまるごとに、ホーム画面でバックアップをおすすめするように</p>
+        <p>・案内のボタンからその場でファイルに書き出せるように</p>
+      </div>
       <p><strong>v1.3.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-08-12</span></p>
       <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
         <p>・工程の組み合わせを「工程セット」として複数保存できるように</p>
@@ -930,18 +959,21 @@ const STORAGE_KEYS = {
   activeSession: 'seizu_active_session',
   introSeen: 'seizu_intro_seen',
   lastVersion: 'seizu_last_version',
-  clockStart: 'seizu_clock_start'
+  clockStart: 'seizu_clock_start',
+  backupAt: 'seizu_backup_at'
 };
 
+// バックアップの案内を出す間隔（前回バックアップ時からの記録数）
+const BACKUP_NOTICE_EVERY = 10;
+
 // バージョン。更新履歴(ヘルプ画面)と help.html の表記も合わせて更新すること
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const APP_VERSION_DATE = '2026-08-12';
 
 // 更新後に1回だけ出す案内の本文。利用者から見て何が変わったかだけを書く
 const UPDATE_HIGHLIGHTS =
-  '・工程の組み合わせを「工程セット」として複数保存し、開始画面で切り替えられるようになりました\n' +
-  '・設定 → 工程カスタマイズ から追加できます。作図タイムトライアル（60分）などのプリセットも選べます\n' +
-  '・練習回数・ベストタイム・分析は工程セットごとに集計します';
+  '・記録がたまってきたら、ホーム画面でバックアップをおすすめするようになりました\n' +
+  '・その場のボタンからファイルに書き出せます（記録はこの端末にしかないため）';
 
 // ========================================
 // 1.5 Dialog (alert / confirm の置き換え)
@@ -1252,6 +1284,25 @@ function stepKey(st) {
   if (st && typeof st.id === 'string' && st.id) return st.id;
   const name = st && typeof st.name === 'string' ? st.name : '';
   return DEFAULT_STEP_ID_BY_NAME[name] || ('name:' + name);
+}
+
+// ========================================
+// 2.6 バックアップの案内
+// ========================================
+// localStorage はブラウザのデータ削除で全部消えるが、自分から書き出す人はまずいない。
+// 記録が一定数たまったら促す。基準は「前回バックアップした（または「あとで」を押した）
+// 時点の記録数」で、そこから BACKUP_NOTICE_EVERY 件ふえたらまた出す
+function getBackupBaseline() {
+  const n = parseInt(localStorage.getItem(STORAGE_KEYS.backupAt), 10);
+  // 未設定なら 0。既に10件以上ためている人には初回起動時から出す（一度も控えていないため）
+  return isFinite(n) && n >= 0 ? n : 0;
+}
+function setBackupBaseline(count) {
+  return writeStorage(STORAGE_KEYS.backupAt, String(count));
+}
+// 案内を出すべきか。セッションを削除して基準を下回った場合は出さない
+function shouldNoticeBackup(sessionCount) {
+  return sessionCount - getBackupBaseline() >= BACKUP_NOTICE_EVERY;
 }
 
 function getStats() {
@@ -1829,6 +1880,29 @@ function renderHome() {
   const noteEl = document.getElementById('home-active-templates');
   noteEl.style.display = note.length ? '' : 'none';
   noteEl.textContent = note.length ? '使用中の工程セット　' + note.join('　/　') : '';
+
+  renderBackupNotice(sessions.length);
+}
+
+// 記録がたまってきたらバックアップを促す。ホーム画面にだけ出す
+function renderBackupNotice(sessionCount) {
+  const el = document.getElementById('backup-notice');
+  if (!shouldNoticeBackup(sessionCount)) { el.style.display = 'none'; return; }
+  const since = sessionCount - getBackupBaseline();
+  // ホーム画面は縦に余裕がないので、警告は1〜2行に収める（詳しい説明はヘルプにある）
+  document.getElementById('backup-notice-text').textContent =
+    '未バックアップの記録が' + since + '件あります。この端末にしか残らないので、ファイルに書き出しておきましょう。';
+  el.style.display = '';
+}
+
+// 案内から直接バックアップする。書き出せたら基準を更新して案内を引っ込める
+function backupFromNotice() {
+  exportJSON();
+}
+
+function dismissBackupNotice() {
+  setBackupBaseline(getSessions().length);
+  document.getElementById('backup-notice').style.display = 'none';
 }
 
 // ========================================
@@ -2530,15 +2604,19 @@ function loadThemeColor() {
 // 10. Data Import/Export
 // ========================================
 function exportJSON() {
+  const sessions = getSessions();
   const data = {
     version: 1,
     exportDate: new Date().toISOString(),
-    sessions: getSessions(),
+    sessions: sessions,
     templates: getTemplates(),
     stats: getStats()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   downloadBlob(blob, 'seizu_backup_' + formatDateFile(new Date()) + '.json');
+  // 書き出した時点の記録数を控える。次の案内はここから10件たまったとき
+  setBackupBaseline(sessions.length);
+  if (currentScreen === 'home') renderBackupNotice(sessions.length);
 }
 
 function importJSON(event) {
@@ -2636,6 +2714,8 @@ async function confirmResetAll() {
   localStorage.removeItem(STORAGE_KEYS.sessions);
   localStorage.removeItem(STORAGE_KEYS.templates);
   localStorage.removeItem(STORAGE_KEYS.stats);
+  // バックアップ案内の基準も消す（記録が0件に戻るので、次は10件目から案内する）
+  localStorage.removeItem(STORAGE_KEYS.backupAt);
   // 中断中のセッションが残っていると削除後に復活するので一緒に消す
   clearActiveSession();
   notify('全データを削除しました');

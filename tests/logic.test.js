@@ -75,7 +75,9 @@ const EXPORTED = [
   'sessionTemplateId', 'sessionTemplateName', 'stepKey', 'uniqueTemplateName',
   'getSessions', 'saveSessions', 'getStats', 'saveStats', 'getBestTotal', 'recalcStats',
   'buildStepLabels', 'renderCompare', 'renderRatingAnalysis', 'validateImport',
-  'saveSession', 'lap', 'finishSession'
+  'saveSession', 'lap', 'finishSession',
+  'BACKUP_NOTICE_EVERY', 'getBackupBaseline', 'setBackupBaseline', 'shouldNoticeBackup',
+  'renderBackupNotice', 'dismissBackupNotice', 'renderHome'
 ];
 
 function extractScript() {
@@ -513,6 +515,73 @@ test('保存した記録に工程セット id と工程 id が入る', () => {
   // id を持たないラップでも、工程名から既定 id を引き当てて保存する
   eq(saved[0].steps[1].id, 's_grid');
   eq(saved[0].completed, true);
+});
+
+// ================================================================ 8. バックアップの案内
+
+function manySessions(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(newSession({ id: 's' + i }));
+  return out;
+}
+
+test('記録が10件たまるまで案内は出ない', () => {
+  const app = loadApp(seedWith(manySessions(9)));
+  eq(app.BACKUP_NOTICE_EVERY, 10);
+  ok(!app.shouldNoticeBackup(9));
+  ok(app.shouldNoticeBackup(10));
+  ok(app.shouldNoticeBackup(11));
+});
+
+test('一度も控えていない既存利用者には初回から案内が出る', () => {
+  const app = loadApp(seedWith(manySessions(30)));
+  eq(app.getBackupBaseline(), 0, '未設定なら基準は0');
+  ok(app.shouldNoticeBackup(30));
+  app.renderHome();
+  const el = app._els['backup-notice'];
+  eq(el.style.display, '', '案内が表示されていない');
+  ok(app._els['backup-notice-text'].textContent.indexOf('30件') !== -1,
+    '件数が本文に出ていない: ' + app._els['backup-notice-text'].textContent);
+});
+
+test('「あとで」を押すと引っ込み、さらに10件たまるまで出ない', () => {
+  const app = loadApp(seedWith(manySessions(12)));
+  app.renderHome();
+  eq(app._els['backup-notice'].style.display, '');
+  app.dismissBackupNotice();
+  eq(app._els['backup-notice'].style.display, 'none');
+  eq(app.getBackupBaseline(), 12, '基準が現在の件数に更新されていない');
+  ok(!app.shouldNoticeBackup(12));
+  ok(!app.shouldNoticeBackup(21), '10件たまる前に再表示されている');
+  ok(app.shouldNoticeBackup(22));
+});
+
+test('基準は localStorage に残り、次の起動でも引き継がれる', () => {
+  const app = loadApp(seedWith(manySessions(15)));
+  app.setBackupBaseline(15);
+  const saved = app._storage.getItem('seizu_backup_at');
+  eq(saved, '15');
+  const restarted = loadApp(Object.assign(seedWith(manySessions(15)), { seizu_backup_at: '15' }));
+  eq(restarted.getBackupBaseline(), 15);
+  ok(!restarted.shouldNoticeBackup(15));
+  restarted.renderHome();
+  eq(restarted._els['backup-notice'].style.display, 'none');
+});
+
+test('記録を削除して基準を下回っても案内は出ない', () => {
+  const app = loadApp(Object.assign(seedWith(manySessions(3)), { seizu_backup_at: '20' }));
+  ok(!app.shouldNoticeBackup(3));
+  app.renderHome();
+  eq(app._els['backup-notice'].style.display, 'none');
+});
+
+test('壊れた基準値は0として扱う（案内が出なくなるより出るほうが安全）', () => {
+  ['', 'abc', '-5', 'NaN'].forEach(v => {
+    const app = loadApp({ seizu_backup_at: v });
+    eq(app.getBackupBaseline(), 0, '入力 "' + v + '"');
+  });
+  const ok10 = loadApp({ seizu_backup_at: '10' });
+  eq(ok10.getBackupBaseline(), 10);
 });
 
 test('validateImport は工程 id の無い旧バックアップも受け付ける', () => {
