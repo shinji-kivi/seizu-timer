@@ -324,7 +324,8 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 .filter-bar {
   display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;
 }
-.filter-bar select { width:auto; min-width:120px; padding:8px 12px; font-size:0.85rem; }
+/* max-width: 工程セット名は長くなりがちなので、選択肢の幅で行が押し出されないよう頭を押さえる */
+.filter-bar select { width:auto; min-width:120px; max-width:190px; padding:8px 12px; font-size:0.85rem; }
 .chart-container { position:relative; margin-bottom:24px; background:var(--bg-card); border-radius:var(--radius); padding:16px; }
 .chart-container canvas { min-height:300px; max-height:450px; }
 .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
@@ -457,6 +458,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <a href="help.html" target="_blank" rel="noopener" style="position:absolute;top:0;right:0;background:none;border:1px solid var(--border);border-radius:50%;width:32px;height:32px;color:var(--text-dim);font-size:0.9rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;text-decoration:none">?</a>
   </div>
   <div class="home-stats" id="home-stats"></div>
+  <div id="home-active-templates" style="display:none;color:var(--text-dim);font-size:0.8rem;margin-top:8px;text-align:center"></div>
   <div class="menu-card menu-card-main" onclick="showScreen('setup')">
     <div class="icon">&#9201;</div>
     <div class="label">新規セッション</div>
@@ -495,12 +497,17 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   </div>
   <div class="form-group">
     <label>モード</label>
-    <select id="setup-mode" onchange="updateSetupPreview()">
+    <select id="setup-mode" onchange="onSetupModeChange()">
       <option value="full">フルモード（390分）</option>
       <option value="esquisse">エスキスのみ（150分）</option>
       <option value="drawing">作図のみ（180分）</option>
       <option value="writing">記述のみ（60分）</option>
     </select>
+  </div>
+  <div class="form-group">
+    <label>工程セット</label>
+    <select id="setup-template" onchange="updateSetupPreview()"></select>
+    <p style="color:var(--text-dim);font-size:0.85rem;margin-top:6px">工程の組み合わせを切り替えます。設定 → 工程カスタマイズ で追加・編集できます。</p>
   </div>
   <div class="form-group">
     <label>本番の開始時刻（任意）</label>
@@ -574,6 +581,9 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <option value="drawing">作図</option>
       <option value="writing">記述</option>
     </select>
+    <select id="history-template-filter" onchange="renderHistory()" style="display:none">
+      <option value="">全工程セット</option>
+    </select>
   </div>
   <div id="history-list"></div>
 </div>
@@ -599,6 +609,9 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <option value="esquisse">エスキス</option>
       <option value="drawing">作図</option>
       <option value="writing">記述</option>
+    </select>
+    <select id="analysis-template-filter" onchange="renderAnalysis()" style="display:none">
+      <option value="">全工程セット</option>
     </select>
     <select id="analysis-task-filter" onchange="renderAnalysis()">
       <option value="">全課題</option>
@@ -641,12 +654,39 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div id="settings-steps">
     <div class="form-group">
       <label>モード選択</label>
-      <select id="settings-mode" onchange="renderStepEditor()">
+      <select id="settings-mode" onchange="onSettingsModeChange()">
         <option value="full">フルモード</option>
         <option value="esquisse">エスキスのみ</option>
         <option value="drawing">作図のみ</option>
         <option value="writing">記述のみ</option>
       </select>
+    </div>
+    <div class="form-group">
+      <label>工程セット</label>
+      <select id="settings-template" onchange="onSettingsTemplateChange()"></select>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="showTemplateAddPanel()">＋ セットを追加</button>
+        <button class="btn btn-outline btn-sm" id="btn-delete-template" onclick="deleteTemplate()">このセットを削除</button>
+      </div>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:8px">同じモードの中に工程の組み合わせを複数持てます。開始画面で切り替えて使い、回数・ベストタイム・分析はセットごとに集計します。</p>
+    </div>
+    <div class="card" id="template-add-panel" style="display:none;margin-bottom:16px">
+      <div class="form-group">
+        <label>下敷きにする工程</label>
+        <select id="template-add-base" onchange="onTemplateBaseChange()"></select>
+      </div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label>セット名</label>
+        <input type="text" id="template-add-name" autocomplete="off">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="createTemplate()">作成</button>
+        <button class="btn btn-outline btn-sm" onclick="hideTemplateAddPanel()">キャンセル</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>セット名</label>
+      <input type="text" id="template-name" autocomplete="off">
     </div>
     <div id="step-editor-list"></div>
     <div id="step-editor-total" style="text-align:right;font-size:0.9rem;margin-top:8px;font-weight:600;display:none"></div>
@@ -708,12 +748,17 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
         <p>作図のみ：作図・断面図のみ</p>
         <p>記述のみ：計画の要点のみ</p>
       </div>
-      <p style="margin-top:4px"><strong>③ 本番の開始時刻</strong>を設定（任意）</p>
+      <p style="margin-top:4px"><strong>③ 工程セット</strong>を選ぶ</p>
+      <div style="margin-left:12px;color:var(--text-dim);font-size:0.85rem">
+        <p>同じモードの中に工程の組み合わせを複数持てます（例：作図の「本番想定（180分）」と「作図タイムトライアル（60分）」）</p>
+        <p>設定 → 工程カスタマイズ で追加・編集できます</p>
+      </div>
+      <p style="margin-top:4px"><strong>④ 本番の開始時刻</strong>を設定（任意）</p>
       <div style="margin-left:12px;color:var(--text-dim);font-size:0.85rem">
         <p>本番が11:00開始なら 11:00 のままでOK。工程一覧に「その工程を終えているべき時刻」が出ます</p>
         <p>空欄にすると実時刻の表示をしません</p>
       </div>
-      <p style="margin-top:4px"><strong>④ 計測開始</strong>を押す</p>
+      <p style="margin-top:4px"><strong>⑤ 計測開始</strong>を押す</p>
     </div>
   </div>
 
@@ -749,15 +794,17 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <p><strong>工程内訳</strong>：全工程の積み上げ棒グラフ、または工程を選んで折れ線表示</p>
       <p><strong>工程比較</strong>：各工程の平均・最速・最遅タイム</p>
       <p><strong>評価分析</strong>：工程ごとのGood率（Bad多い工程を強調表示）</p>
-      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">モード・課題名でフィルタ可能</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">モード・工程セット・課題名でフィルタ可能</p>
+      <p style="color:var(--text-dim);font-size:0.85rem">工程名を変えても、同じ工程として過去の記録と繋がったまま集計します</p>
     </div>
   </div>
 
   <div class="card">
     <h3 style="margin-bottom:12px">設定</h3>
     <div style="font-size:0.9rem;line-height:1.8">
-      <p><strong>工程カスタマイズ</strong>：工程名・目標時間の変更、順番の入れ替え</p>
-      <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">フルモードは合計390分になるよう設定（保存時に確認）</p>
+      <p><strong>工程カスタマイズ</strong>：工程セットの追加・削除、工程名・目標時間の変更、順番の入れ替え</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">1つのモードに複数の工程セットを持てます。回数・ベストタイム・分析はセットごとに集計します</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">フルモードの既定セットは合計390分になるよう設定（保存時に確認）</p>
       <p><strong>テーマカラー</strong>：アクセントカラーを変更</p>
       <p><strong>データ管理</strong>：JSONバックアップ・CSVエクスポート・全データリセット</p>
     </div>
@@ -794,6 +841,14 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card" id="help-changelog">
     <h3 style="margin-bottom:12px">更新履歴</h3>
     <div style="font-size:0.9rem;line-height:1.7">
+      <p><strong>v1.3.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-08-12</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
+        <p>・工程の組み合わせを「工程セット」として複数保存できるように</p>
+        <p>・開始画面で工程セットを切り替えられるように</p>
+        <p>・作図タイムトライアル（60分）などのプリセットから追加できるように</p>
+        <p>・練習回数・ベストタイム・分析を工程セットごとに集計するように</p>
+        <p>・工程名を変えても、過去の記録と繋がったまま分析できるように</p>
+      </div>
       <p><strong>v1.2.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-08-08</span></p>
       <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
         <p>・本番の開始時刻を設定できるように</p>
@@ -879,14 +934,14 @@ const STORAGE_KEYS = {
 };
 
 // バージョン。更新履歴(ヘルプ画面)と help.html の表記も合わせて更新すること
-const APP_VERSION = '1.2.0';
-const APP_VERSION_DATE = '2026-08-08';
+const APP_VERSION = '1.3.0';
+const APP_VERSION_DATE = '2026-08-12';
 
 // 更新後に1回だけ出す案内の本文。利用者から見て何が変わったかだけを書く
 const UPDATE_HIGHLIGHTS =
-  '・本番の開始時刻を設定すると、計測中に「本番なら今 15:42」と実時刻で表示されます\n' +
-  '・制限時間に対する残り時間と、終了予定時刻も分かるようになりました\n' +
-  '・工程一覧にも、その工程を終えているべき時刻が出ます';
+  '・工程の組み合わせを「工程セット」として複数保存し、開始画面で切り替えられるようになりました\n' +
+  '・作図タイムトライアル（60分）などのプリセットからすぐ作れます\n' +
+  '・練習回数・ベストタイム・分析は工程セットごとに集計します';
 
 // ========================================
 // 1.5 Dialog (alert / confirm の置き換え)
@@ -917,69 +972,116 @@ function askConfirm(message, okLabel, title, cancelLabel) {
   return openDialog(title || '確認', message, okLabel || 'OK', cancelLabel || 'キャンセル');
 }
 
+// 工程の id は履歴の突き合わせキー。工程名を変えても過去の記録と繋がるように、名前とは別に固定 id を持たせる。
+// **一度配布した id は絶対に変えない**（変えるとその工程の履歴が割れる）。
+// 同じ工程が複数モードに出てくる場合（面積表・記述など）は id を共有する
 const DEFAULT_TEMPLATES = {
   full: [
-    { name: '問題文読み取り', targetTime: 1800 },
-    { name: 'ラフプラン', targetTime: 2700 },
-    { name: '1/400エスキス前チェック', targetTime: 300 },
-    { name: '1/400エスキス', targetTime: 3600 },
-    { name: '中間チェック', targetTime: 600 },
-    { name: '記述（計画の要点等）', targetTime: 3600 },
-    { name: '面積表', targetTime: 240 },
-    { name: '通り心・寸法線（各階同時）', targetTime: 360 },
-    { name: '柱の図示（各階同時）', targetTime: 300 },
-    { name: '外壁の下書き・開口部位置（各階同時）', targetTime: 540 },
-    { name: '外壁仕上げ 太線（各階同時）', targetTime: 720 },
-    { name: '内壁の下書き（各階同時）', targetTime: 540 },
-    { name: '内壁の出入口位置（各階同時）', targetTime: 720 },
-    { name: '内壁仕上げ 太線（各階同時）', targetTime: 1080 },
-    { name: '階段・EV・便所・PS・DS・EPS（各階同時）', targetTime: 600 },
-    { name: '室名・什器・断面図切断線（各階同時）', targetTime: 2100 },
-    { name: '外構（各階同時）', targetTime: 600 },
-    { name: '法的な記入項目（各階同時）', targetTime: 600 },
-    { name: '境界線・通り心・横寸法（断面図）', targetTime: 180 },
-    { name: '床高・縦寸法・スラブ厚等（断面図）', targetTime: 300 },
-    { name: '梁幅・梁せいの下書き（断面図）', targetTime: 240 },
-    { name: '開口部・間仕切壁の下書き（断面図）', targetTime: 180 },
-    { name: '断面の仕上げ 太線（断面図）', targetTime: 600 },
-    { name: '天井高・室名・屋上設備等（断面図）', targetTime: 300 },
-    { name: '補足事項・タイル目地・植栽等', targetTime: 600 }
+    { id: 's_read', name: '問題文読み取り', targetTime: 1800 },
+    { id: 's_rough', name: 'ラフプラン', targetTime: 2700 },
+    { id: 's_precheck', name: '1/400エスキス前チェック', targetTime: 300 },
+    { id: 's_esq400', name: '1/400エスキス', targetTime: 3600 },
+    { id: 's_midcheck', name: '中間チェック', targetTime: 600 },
+    { id: 's_writing', name: '記述（計画の要点等）', targetTime: 3600 },
+    { id: 's_area', name: '面積表', targetTime: 240 },
+    { id: 's_grid', name: '通り心・寸法線（各階同時）', targetTime: 360 },
+    { id: 's_column', name: '柱の図示（各階同時）', targetTime: 300 },
+    { id: 's_extdraft', name: '外壁の下書き・開口部位置（各階同時）', targetTime: 540 },
+    { id: 's_extfinish', name: '外壁仕上げ 太線（各階同時）', targetTime: 720 },
+    { id: 's_intdraft', name: '内壁の下書き（各階同時）', targetTime: 540 },
+    { id: 's_intopening', name: '内壁の出入口位置（各階同時）', targetTime: 720 },
+    { id: 's_intfinish', name: '内壁仕上げ 太線（各階同時）', targetTime: 1080 },
+    { id: 's_core', name: '階段・EV・便所・PS・DS・EPS（各階同時）', targetTime: 600 },
+    { id: 's_roomname', name: '室名・什器・断面図切断線（各階同時）', targetTime: 2100 },
+    { id: 's_exterior', name: '外構（各階同時）', targetTime: 600 },
+    { id: 's_legal', name: '法的な記入項目（各階同時）', targetTime: 600 },
+    { id: 's_sec_base', name: '境界線・通り心・横寸法（断面図）', targetTime: 180 },
+    { id: 's_sec_level', name: '床高・縦寸法・スラブ厚等（断面図）', targetTime: 300 },
+    { id: 's_sec_beam', name: '梁幅・梁せいの下書き（断面図）', targetTime: 240 },
+    { id: 's_sec_open', name: '開口部・間仕切壁の下書き（断面図）', targetTime: 180 },
+    { id: 's_sec_finish', name: '断面の仕上げ 太線（断面図）', targetTime: 600 },
+    { id: 's_sec_ceil', name: '天井高・室名・屋上設備等（断面図）', targetTime: 300 },
+    { id: 's_extra', name: '補足事項・タイル目地・植栽等', targetTime: 600 }
   ],
   esquisse: [
-    { name: '問題文読み取り', targetTime: 1800 },
-    { name: 'ラフプラン', targetTime: 2700 },
-    { name: '1/400エスキス前チェック', targetTime: 300 },
-    { name: '1/400エスキス', targetTime: 3600 },
-    { name: '中間チェック', targetTime: 600 }
+    { id: 's_read', name: '問題文読み取り', targetTime: 1800 },
+    { id: 's_rough', name: 'ラフプラン', targetTime: 2700 },
+    { id: 's_precheck', name: '1/400エスキス前チェック', targetTime: 300 },
+    { id: 's_esq400', name: '1/400エスキス', targetTime: 3600 },
+    { id: 's_midcheck', name: '中間チェック', targetTime: 600 }
   ],
   drawing: [
-    { name: '面積表', targetTime: 240 },
-    { name: '通り心・寸法線（各階同時）', targetTime: 360 },
-    { name: '柱の図示（各階同時）', targetTime: 300 },
-    { name: '外壁の下書き・開口部位置（各階同時）', targetTime: 540 },
-    { name: '外壁仕上げ 太線（各階同時）', targetTime: 720 },
-    { name: '内壁の下書き（各階同時）', targetTime: 540 },
-    { name: '内壁の出入口位置（各階同時）', targetTime: 720 },
-    { name: '内壁仕上げ 太線（各階同時）', targetTime: 1080 },
-    { name: '階段・EV・便所・PS・DS・EPS（各階同時）', targetTime: 600 },
-    { name: '室名・什器・断面図切断線（各階同時）', targetTime: 2100 },
-    { name: '外構（各階同時）', targetTime: 600 },
-    { name: '法的な記入項目（各階同時）', targetTime: 600 },
-    { name: '境界線・通り心・横寸法（断面図）', targetTime: 180 },
-    { name: '床高・縦寸法・スラブ厚等（断面図）', targetTime: 300 },
-    { name: '梁幅・梁せいの下書き（断面図）', targetTime: 240 },
-    { name: '開口部・間仕切壁の下書き（断面図）', targetTime: 180 },
-    { name: '断面の仕上げ 太線（断面図）', targetTime: 600 },
-    { name: '天井高・室名・屋上設備等（断面図）', targetTime: 300 },
-    { name: '補足事項・タイル目地・植栽等', targetTime: 600 }
+    { id: 's_area', name: '面積表', targetTime: 240 },
+    { id: 's_grid', name: '通り心・寸法線（各階同時）', targetTime: 360 },
+    { id: 's_column', name: '柱の図示（各階同時）', targetTime: 300 },
+    { id: 's_extdraft', name: '外壁の下書き・開口部位置（各階同時）', targetTime: 540 },
+    { id: 's_extfinish', name: '外壁仕上げ 太線（各階同時）', targetTime: 720 },
+    { id: 's_intdraft', name: '内壁の下書き（各階同時）', targetTime: 540 },
+    { id: 's_intopening', name: '内壁の出入口位置（各階同時）', targetTime: 720 },
+    { id: 's_intfinish', name: '内壁仕上げ 太線（各階同時）', targetTime: 1080 },
+    { id: 's_core', name: '階段・EV・便所・PS・DS・EPS（各階同時）', targetTime: 600 },
+    { id: 's_roomname', name: '室名・什器・断面図切断線（各階同時）', targetTime: 2100 },
+    { id: 's_exterior', name: '外構（各階同時）', targetTime: 600 },
+    { id: 's_legal', name: '法的な記入項目（各階同時）', targetTime: 600 },
+    { id: 's_sec_base', name: '境界線・通り心・横寸法（断面図）', targetTime: 180 },
+    { id: 's_sec_level', name: '床高・縦寸法・スラブ厚等（断面図）', targetTime: 300 },
+    { id: 's_sec_beam', name: '梁幅・梁せいの下書き（断面図）', targetTime: 240 },
+    { id: 's_sec_open', name: '開口部・間仕切壁の下書き（断面図）', targetTime: 180 },
+    { id: 's_sec_finish', name: '断面の仕上げ 太線（断面図）', targetTime: 600 },
+    { id: 's_sec_ceil', name: '天井高・室名・屋上設備等（断面図）', targetTime: 300 },
+    { id: 's_extra', name: '補足事項・タイル目地・植栽等', targetTime: 600 }
   ],
   writing: [
-    { name: '記述（計画の要点等）', targetTime: 3600 }
+    { id: 's_writing', name: '記述（計画の要点等）', targetTime: 3600 }
   ]
 };
 
 const MODE_LABELS = { full: 'フル', esquisse: 'エスキス', drawing: '作図', writing: '記述' };
 const MODES = Object.keys(MODE_LABELS);
+
+// 既定の工程セットの名前。モードごとに1つ、必ず存在する
+const DEFAULT_TEMPLATE_NAMES = {
+  full: '本番想定（390分）',
+  esquisse: '標準（150分）',
+  drawing: '本番想定（180分）',
+  writing: '標準（60分）'
+};
+
+// 「工程セットを追加」で選べる下敷き。講義録の時間配分をそのまま入れてある。
+// id は固定にしておく（同じプリセットから作り直しても、過去の記録と繋がるようにするため）
+const PRESET_TEMPLATES = {
+  full: [
+    { name: '本番想定・大枠（6工程）', steps: [
+      { id: 's_p_read', name: 'A 読み取り', targetTime: 1800 },
+      { id: 's_p_rough', name: 'B 条件整理〜ラフプラン', targetTime: 3000 },
+      { id: 's_p_esq', name: 'C 1/400エスキス', targetTime: 3600 },
+      { id: 's_p_draw', name: 'D 作図', targetTime: 9000 },
+      { id: 's_p_write', name: 'H 記述', targetTime: 3600 },
+      { id: 's_p_check', name: 'チェック', targetTime: 2400 }
+    ] }
+  ],
+  esquisse: [],
+  drawing: [
+    { name: '作図タイムトライアル（60分）', steps: [
+      { id: 's_tt1', name: 'STEP1 通り心・寸法線・柱', targetTime: 600 },
+      { id: 's_tt2', name: 'STEP2 壁と開口部の下書き', targetTime: 900 },
+      { id: 's_tt3', name: 'STEP3 壁・開口部の仕上げ', targetTime: 900 },
+      { id: 's_tt4', name: 'STEP4 吹抜け・階段・EV・庇・延焼ライン', targetTime: 600 },
+      { id: 's_tt5', name: 'STEP5 断面図', targetTime: 600 }
+    ] }
+  ],
+  writing: []
+};
+
+// 工程名 → 既定 id の逆引き。id を持たない過去の記録を新しい id に合流させるために使う。
+// 同じ名前が複数モードに出てきても id は同じなので、引き当ては一意になる
+const DEFAULT_STEP_ID_BY_NAME = (function () {
+  const map = {};
+  Object.keys(DEFAULT_TEMPLATES).forEach(m => {
+    DEFAULT_TEMPLATES[m].forEach(s => { map[s.name] = s.id; });
+  });
+  return map;
+})();
 
 // ========================================
 // 2. Storage Layer
@@ -1001,28 +1103,157 @@ function writeStorage(key, value) {
 function saveSessions(sessions) {
   return writeStorage(STORAGE_KEYS.sessions, JSON.stringify(sessions));
 }
-// 工程テンプレートの妥当性チェック。壊れたテンプレートを取り込むとアプリが起動不能になるため、
-// 全モードが「name(文字列)と targetTime(正の数)を持つ工程の配列」であることまで確認する
-function validateTemplates(t) {
-  if (typeof t !== 'object' || t === null) return false;
-  return MODES.every(m => {
-    if (!Array.isArray(t[m]) || t[m].length === 0) return false;
-    return t[m].every(s =>
-      s && typeof s.name === 'string' && s.name.length > 0 &&
-      typeof s.targetTime === 'number' && isFinite(s.targetTime) && s.targetTime > 0
-    );
+// ========================================
+// 2.5 工程セット（テンプレート）
+// ========================================
+// 保存形式 v2:
+//   { version:2, list:[{ id, mode, name, steps:[{id,name,targetTime}] }], active:{ mode: templateId } }
+// v1（{ full:[...], esquisse:[...] } のモードごとに1本）からは getTemplates() で自動移行する
+
+function defaultTemplateId(mode) { return 'tpl_' + mode + '_default'; }
+
+// 利用者が追加した工程の id。既定 id（s_ 始まり）と衝突しないよう u_ を前置する
+function newStepId() {
+  return 'u_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function newTemplateId() {
+  return 'tpl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// 1つの工程セット内で id が重複すると、分析の突き合わせが必ず先頭の工程に吸われる。
+// 同じ工程を2回置いた場合は後ろ側に新しい id を振り直す
+function dedupeStepIds(steps) {
+  const seen = new Set();
+  return steps.map(s => {
+    let id = s.id;
+    while (!id || seen.has(id)) id = newStepId();
+    seen.add(id);
+    return { id, name: s.name, targetTime: s.targetTime };
   });
 }
+
+function buildDefaultTemplateStore() {
+  const active = {};
+  MODES.forEach(m => { active[m] = defaultTemplateId(m); });
+  return {
+    version: 2,
+    list: MODES.map(m => ({
+      id: defaultTemplateId(m),
+      mode: m,
+      name: DEFAULT_TEMPLATE_NAMES[m],
+      steps: JSON.parse(JSON.stringify(DEFAULT_TEMPLATES[m]))
+    })),
+    active: active
+  };
+}
+
+function isValidSteps(steps) {
+  if (!Array.isArray(steps) || steps.length === 0) return false;
+  return steps.every(s =>
+    s && typeof s.id === 'string' && s.id.length > 0 &&
+    typeof s.name === 'string' && s.name.length > 0 &&
+    typeof s.targetTime === 'number' && isFinite(s.targetTime) && s.targetTime > 0
+  );
+}
+
+// 壊れた工程セットを取り込むとアプリが起動不能になるため、形を厳密に確認する。
+// 「各モードに最低1本あり、使用中の指定が実在する」ところまで見る
+function validateTemplates(t) {
+  if (typeof t !== 'object' || t === null) return false;
+  if (t.version !== 2 || !Array.isArray(t.list) || t.list.length === 0) return false;
+  if (typeof t.active !== 'object' || t.active === null) return false;
+  const ids = new Set();
+  for (const tpl of t.list) {
+    if (!tpl || typeof tpl.id !== 'string' || tpl.id.length === 0) return false;
+    if (ids.has(tpl.id)) return false;
+    ids.add(tpl.id);
+    if (MODES.indexOf(tpl.mode) === -1) return false;
+    if (typeof tpl.name !== 'string' || tpl.name.length === 0) return false;
+    if (!isValidSteps(tpl.steps)) return false;
+    const stepIds = new Set();
+    for (const s of tpl.steps) {
+      if (stepIds.has(s.id)) return false;
+      stepIds.add(s.id);
+    }
+  }
+  return MODES.every(m => {
+    const owned = t.list.filter(x => x.mode === m);
+    return owned.length > 0 && owned.some(x => x.id === t.active[m]);
+  });
+}
+
+// v1 の工程セットを v2 へ。工程名から既定 id を引き当てて過去の記録と繋がるようにし、
+// 引き当たらない工程（利用者が付けた名前）には新しい id を振る
+function migrateTemplatesV1(old) {
+  const store = buildDefaultTemplateStore();
+  MODES.forEach(m => {
+    const steps = old && Array.isArray(old[m]) ? old[m] : null;
+    if (!steps || steps.length === 0) return;
+    const converted = [];
+    steps.forEach(s => {
+      const name = s && typeof s.name === 'string' ? s.name.trim() : '';
+      if (!name) return;
+      const t = s && typeof s.targetTime === 'number' && isFinite(s.targetTime) && s.targetTime > 0
+        ? s.targetTime : 60;
+      converted.push({ id: DEFAULT_STEP_ID_BY_NAME[name] || newStepId(), name: name, targetTime: t });
+    });
+    if (converted.length === 0) return;
+    store.list.find(x => x.id === defaultTemplateId(m)).steps = dedupeStepIds(converted);
+  });
+  return store;
+}
+
 function getTemplates() {
-  try {
-    const t = JSON.parse(localStorage.getItem(STORAGE_KEYS.templates));
-    if (validateTemplates(t)) return t;
-  } catch {}
-  return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES));
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(STORAGE_KEYS.templates)); } catch {}
+  if (raw === null || typeof raw !== 'object') return buildDefaultTemplateStore();
+  if (validateTemplates(raw)) return raw;
+  // version を持たないものは v1 とみなして移行する。それ以外の壊れたデータは既定に戻す
+  if (!raw.version) {
+    const migrated = migrateTemplatesV1(raw);
+    if (validateTemplates(migrated)) return migrated;
+  }
+  return buildDefaultTemplateStore();
 }
 function saveTemplates(templates) {
   return writeStorage(STORAGE_KEYS.templates, JSON.stringify(templates));
 }
+function templatesOfMode(store, mode) { return store.list.filter(t => t.mode === mode); }
+function findTemplate(id, store) {
+  store = store || getTemplates();
+  return store.list.find(t => t.id === id) || null;
+}
+// 使用中の工程セット。指定が壊れていてもそのモードの先頭を返す（必ず1本は存在する）
+function getActiveTemplate(mode, store) {
+  store = store || getTemplates();
+  const list = templatesOfMode(store, mode);
+  return list.find(t => t.id === store.active[mode]) || list[0];
+}
+function setActiveTemplate(mode, id) {
+  const store = getTemplates();
+  if (!store.list.some(t => t.id === id && t.mode === mode)) return false;
+  store.active[mode] = id;
+  return saveTemplates(store);
+}
+// 記録がどの工程セットのものか。工程セット導入（v1.3.0）以前の記録は、そのモードの既定セット扱い
+function sessionTemplateId(s) {
+  return (s && typeof s.templateId === 'string' && s.templateId) ? s.templateId : defaultTemplateId(s.mode);
+}
+// 表示用の工程セット名。セットを削除した後でも、記録に控えてある名前で読めるようにする
+function sessionTemplateName(s, store) {
+  const tpl = findTemplate(sessionTemplateId(s), store);
+  if (tpl) return tpl.name;
+  if (s && typeof s.templateName === 'string' && s.templateName) return s.templateName;
+  return DEFAULT_TEMPLATE_NAMES[s.mode] || '';
+}
+// 履歴の突き合わせキー。id を持つ記録は id、持たない古い記録は工程名から既定 id を引き当て、
+// それでも当たらなければ工程名そのもの（v1.2.0 以前と同じ挙動）
+function stepKey(st) {
+  if (st && typeof st.id === 'string' && st.id) return st.id;
+  const name = st && typeof st.name === 'string' ? st.name : '';
+  return DEFAULT_STEP_ID_BY_NAME[name] || ('name:' + name);
+}
+
 function getStats() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.stats)) || { totalSessions: 0, bestTimes: {} }; }
   catch { return { totalSessions: 0, bestTimes: {} }; }
@@ -1031,24 +1262,27 @@ function saveStats(stats) {
   return writeStorage(STORAGE_KEYS.stats, JSON.stringify(stats));
 }
 // ベストタイムを取り出す。未記録なら null（Infinity は JSON 保存で null 化するのでここで吸収）
-function getBestTotal(stats, mode) {
-  const bt = stats && stats.bestTimes && stats.bestTimes[mode];
+function getBestTotal(stats, templateId) {
+  const bt = stats && stats.bestTimes && stats.bestTimes[templateId];
   if (!bt || typeof bt.total !== 'number' || !isFinite(bt.total)) return null;
   return bt.total;
 }
-// セッション実データからベストタイム・回数を作り直す（削除・インポート後の整合用）
+// セッション実データからベストタイム・回数を作り直す（削除・インポート後の整合用）。
+// 集計は工程セット単位（60分のタイムトライアルと180分の本番想定が同じベストを奪い合わないように）
 function recalcStats() {
   const sessions = getSessions();
-  const stats = { totalSessions: sessions.length, bestTimes: {} };
+  const stats = { version: 2, totalSessions: sessions.length, bestTimes: {} };
   sessions.forEach(s => {
-    if (!stats.bestTimes[s.mode]) stats.bestTimes[s.mode] = { steps: {} };
-    const bt = stats.bestTimes[s.mode];
+    const tplId = sessionTemplateId(s);
+    if (!stats.bestTimes[tplId]) stats.bestTimes[tplId] = { steps: {} };
+    const bt = stats.bestTimes[tplId];
     // 途中終了した回はベストタイムに数えない
     if (s.completed !== false && (typeof bt.total !== 'number' || s.totalTime < bt.total)) {
       bt.total = s.totalTime;
     }
     (s.steps || []).forEach(st => {
-      if (!bt.steps[st.name] || st.actualTime < bt.steps[st.name]) bt.steps[st.name] = st.actualTime;
+      const k = stepKey(st);
+      if (!bt.steps[k] || st.actualTime < bt.steps[k]) bt.steps[k] = st.actualTime;
     });
   });
   saveStats(stats);
@@ -1068,8 +1302,8 @@ function showScreen(id) {
   if (id === 'home') renderHome();
   if (id === 'history') renderHistory();
   if (id === 'analysis') renderAnalysis();
-  if (id === 'settings') renderStepEditor();
-  if (id === 'setup') updateSetupPreview();
+  if (id === 'settings') renderSettingsTemplateSelect();
+  if (id === 'setup') onSetupModeChange();
 }
 
 // ========================================
@@ -1079,6 +1313,8 @@ let timerState = {
   running: false,
   paused: false,
   mode: 'full',
+  templateId: '',
+  templateName: '',
   taskName: '',
   memo: '',
   steps: [],
@@ -1098,6 +1334,7 @@ function saveActiveSession(phase) {
   const data = {
     phase: phase,
     mode: timerState.mode, taskName: timerState.taskName, memo: timerState.memo,
+    templateId: timerState.templateId, templateName: timerState.templateName,
     steps: timerState.steps, currentStep: timerState.currentStep,
     totalElapsed: timerState.totalElapsed, stepElapsed: timerState.stepElapsed,
     laps: timerState.laps, paused: timerState.paused,
@@ -1123,6 +1360,9 @@ function tryResumeSession() {
       timerState = {
         running: false, paused: false,
         mode: data.mode, taskName: data.taskName, memo: data.memo,
+        // v1.2.0 以前の中断データには工程セットの情報が無いので既定セット扱いにする
+        templateId: data.templateId || defaultTemplateId(data.mode),
+        templateName: data.templateName || '',
         steps: data.steps, currentStep: data.currentStep,
         totalElapsed: data.totalElapsed, stepElapsed: 0,
         intervalId: null, laps: data.laps || [],
@@ -1140,6 +1380,8 @@ function tryResumeSession() {
     timerState = {
       running: true, paused: paused,
       mode: data.mode, taskName: data.taskName, memo: data.memo,
+      templateId: data.templateId || defaultTemplateId(data.mode),
+      templateName: data.templateName || '',
       steps: data.steps, currentStep: data.currentStep,
       totalElapsed: data.totalElapsed + elapsed,
       stepElapsed: data.stepElapsed + elapsed,
@@ -1189,13 +1431,17 @@ function startSession() {
   const mode = document.getElementById('setup-mode').value;
   const memo = document.getElementById('setup-memo').value.trim();
   if (!taskName) { document.getElementById('task-error').style.display='block'; document.getElementById('setup-task').focus(); return; }
-  const templates = getTemplates();
+  // 開始画面で選んだ工程セットを使用中にしてから、その内容で計測を始める
+  const tplId = document.getElementById('setup-template').value;
+  setActiveTemplate(mode, tplId);
+  const tpl = getActiveTemplate(mode);
   const clockRaw = document.getElementById('setup-clock').value;
   // 次回も同じ開始時刻から始めることが多いので覚えておく（保存に失敗しても計測は続ける）
   writeStorage(STORAGE_KEYS.clockStart, clockRaw);
   timerState = {
     running: true, paused: false, mode, taskName, memo,
-    steps: JSON.parse(JSON.stringify(templates[mode])),
+    templateId: tpl.id, templateName: tpl.name,
+    steps: JSON.parse(JSON.stringify(tpl.steps)),
     currentStep: 0, totalElapsed: 0, stepElapsed: 0,
     intervalId: null, laps: [], completed: false,
     clockStart: parseClockInput(clockRaw)
@@ -1320,6 +1566,8 @@ function lap() {
   if (!timerState.running) return;
   const step = timerState.steps[timerState.currentStep];
   timerState.laps.push({
+    // 工程 id は履歴の突き合わせキー。ラップの時点で控えておく
+    id: step.id,
     name: step.name,
     targetTime: step.targetTime,
     actualTime: timerState.stepElapsed,
@@ -1356,7 +1604,7 @@ function finishSession(isComplete) {
       timerState.laps.length <= timerState.currentStep) {
     const step = timerState.steps[timerState.currentStep];
     timerState.laps.push({
-      name: step.name, targetTime: step.targetTime,
+      id: step.id, name: step.name, targetTime: step.targetTime,
       actualTime: timerState.stepElapsed, rating: null, memo: ''
     });
   }
@@ -1396,20 +1644,22 @@ function renderReview() {
   }
   summary.appendChild(paceEl);
 
-  const sessions = getSessions().filter(s => s.mode === timerState.mode);
+  // 「平均」は同じ工程セットの記録だけを対象にする（別セットの同名工程と混ざらないように）
+  const sessions = getSessions().filter(s => sessionTemplateId(s) === timerState.templateId);
   const avgMap = {};
   sessions.forEach(s => {
     s.steps.forEach(st => {
-      if (!avgMap[st.name]) avgMap[st.name] = { total: 0, count: 0 };
-      avgMap[st.name].total += st.actualTime;
-      avgMap[st.name].count++;
+      const k = stepKey(st);
+      if (!avgMap[k]) avgMap[k] = { total: 0, count: 0 };
+      avgMap[k].total += st.actualTime;
+      avgMap[k].count++;
     });
   });
 
   const container = document.getElementById('review-steps');
   container.innerHTML = '';
   timerState.laps.forEach((lap, i) => {
-    const avg = avgMap[lap.name];
+    const avg = avgMap[stepKey(lap)];
     const avgTime = avg ? avg.total / avg.count : null;
     const isOver = lap.actualTime > lap.targetTime;
     const autoRating = isOver ? 'bad' : 'good';
@@ -1480,12 +1730,16 @@ function saveSession() {
     date: new Date().toISOString(),
     taskName: timerState.taskName,
     mode: timerState.mode,
+    // どの工程セットで計測したか。セットを削除した後でも読めるよう名前も控える
+    templateId: timerState.templateId || defaultTemplateId(timerState.mode),
+    templateName: timerState.templateName || '',
     // DOM ではなく timerState を正とする（oninput で同期済み。リロード復元時の取りこぼし防止）
     memo: (timerState.memo || '').trim(),
     totalTime: timerState.totalElapsed,
     // 最終工程までラップしたか。途中で「終了」した回はベスト・成長グラフの対象外にする
     completed: timerState.completed === true,
     steps: timerState.laps.map(l => ({
+      id: l.id || stepKey(l),
       name: l.name,
       targetTime: l.targetTime,
       actualTime: l.actualTime,
@@ -1494,7 +1748,7 @@ function saveSession() {
     }))
   };
   // 更新前のベストを控えてから保存する（更新演出の判定用）
-  const prevBest = getBestTotal(getStats(), session.mode);
+  const prevBest = getBestTotal(getStats(), session.templateId);
   const sessions = getSessions();
   sessions.push(session);
   // 保存に失敗したら振り返り画面に留まる。ここでホームへ戻すと計測結果が消える
@@ -1502,10 +1756,12 @@ function saveSession() {
   clearActiveSession();
   recalcStats();
 
-  const completedCount = sessions.filter(s => s.mode === session.mode && s.completed !== false).length;
+  // ベスト更新の判定は工程セット単位（別セットの記録と比べても意味がないため）
+  const completedCount = sessions.filter(s =>
+    sessionTemplateId(s) === session.templateId && s.completed !== false).length;
   const isBest = session.completed && (prevBest === null || session.totalTime < prevBest);
   if (isBest && completedCount > 1) {
-    showBestTime(session.totalTime, session.mode);
+    showBestTime(session.totalTime, session.templateName || MODE_LABELS[session.mode]);
   }
   document.getElementById('setup-task').value = '';
   document.getElementById('setup-memo').value = '';
@@ -1545,42 +1801,82 @@ function discardSession() {
 // ========================================
 // 6. Home Screen
 // ========================================
+// 回数・ベスト・前回は「そのモードで使用中の工程セット」の数字を出す。
+// 60分のタイムトライアルと180分の本番想定が同じ枠に混ざらないようにするため
 function renderHome() {
   const sessions = getSessions();
   const stats = getStats();
+  const store = getTemplates();
   const statsEl = document.getElementById('home-stats');
-  const counts = { full: 0, esquisse: 0, drawing: 0, writing: 0 };
-  sessions.forEach(s => { if (counts.hasOwnProperty(s.mode)) counts[s.mode]++; });
-
   const modes = ['esquisse', 'writing', 'drawing', 'full'];
-  const modeLabels = { full: 'フル', esquisse: 'エスキス', drawing: '作図', writing: '記述' };
-  const lastByMode = {};
-  sessions.forEach(s => { lastByMode[s.mode] = s; });
+
   statsEl.innerHTML = modes.map(m => {
-    const bestTotal = getBestTotal(stats, m);
+    const tpl = getActiveTemplate(m, store);
+    const own = sessions.filter(s => s.mode === m && sessionTemplateId(s) === tpl.id);
+    const bestTotal = getBestTotal(stats, tpl.id);
     const bt = bestTotal !== null ? formatTime(bestTotal) : '--:--:--';
-    const last = lastByMode[m] ? formatTime(lastByMode[m].totalTime) : '--:--:--';
+    const last = own.length ? formatTime(own[own.length - 1].totalTime) : '--:--:--';
     return '<div class="home-stat">' +
-      '<div class="value">' + counts[m] + '</div>' +
-      '<div class="label">' + modeLabels[m] + '</div>' +
+      '<div class="value">' + own.length + '</div>' +
+      '<div class="label">' + MODE_LABELS[m] + '</div>' +
       '<div class="best-time">Best ' + bt + '<br>前回 ' + last + '</div>' +
     '</div>';
   }).join('');
+
+  // 工程セットが2つ以上あるモードだけ、いま使っているセット名を添える
+  const note = modes.filter(m => templatesOfMode(store, m).length > 1)
+    .map(m => MODE_LABELS[m] + '：' + getActiveTemplate(m, store).name);
+  const noteEl = document.getElementById('home-active-templates');
+  noteEl.style.display = note.length ? '' : 'none';
+  noteEl.textContent = note.length ? '使用中の工程セット　' + note.join('　/　') : '';
 }
 
 // ========================================
 // 7. History
 // ========================================
+// 既定以外の工程セットで計測した回に、そのセット名を出す
+// （既定セットしか使っていない人の履歴が同じバッジで埋まらないように）
+function templateBadge(s, store) {
+  if (sessionTemplateId(s) === defaultTemplateId(s.mode)) return '';
+  return '<span class="mode-badge" style="background:rgba(255,255,255,0.08);margin-left:4px">' +
+    escapeText(sessionTemplateName(s, store)) + '</span>';
+}
+
 // 途中終了した回の目印（ベスト・成長グラフの対象外であることを示す）
 function incompleteBadge(s) {
   if (s.completed !== false) return '';
   return '<span class="mode-badge" style="background:rgba(251,191,36,0.15);color:var(--warn);margin-left:4px">途中終了</span>';
 }
 
+// 記録に現れる工程セットの選択肢を作る。2つ以上あるときだけ絞り込みを出す
+// （工程セットを1つしか使っていない人に余計な UI を見せない）
+function renderTemplateFilter(selectId, sessions, store) {
+  const select = document.getElementById(selectId);
+  const seen = [];
+  sessions.forEach(s => {
+    const id = sessionTemplateId(s);
+    if (!seen.some(x => x.id === id)) seen.push({ id: id, name: sessionTemplateName(s, store) });
+  });
+  const prev = select.value;
+  select.innerHTML = '<option value="">全工程セット</option>';
+  seen.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id; opt.textContent = t.name;
+    if (t.id === prev) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.style.display = seen.length > 1 ? '' : 'none';
+  if (seen.length <= 1) select.value = '';
+  return select.value;
+}
+
 function renderHistory() {
   const sessions = getSessions();
+  const store = getTemplates();
   const filter = document.getElementById('history-mode-filter').value;
-  const filtered = filter ? sessions.filter(s => s.mode === filter) : sessions;
+  let filtered = filter ? sessions.filter(s => s.mode === filter) : sessions;
+  const tplFilter = renderTemplateFilter('history-template-filter', filtered, store);
+  if (tplFilter) filtered = filtered.filter(s => sessionTemplateId(s) === tplFilter);
   const el = document.getElementById('history-list');
   if (filtered.length === 0) {
     el.innerHTML = '<div class="empty-state"><div class="icon">&#128203;</div><p>該当する履歴がありません</p></div>';
@@ -1595,7 +1891,7 @@ function renderHistory() {
       '<div class="history-card-header">' +
         '<div><div class="task-name">' + escapeText(s.taskName) + '</div>' +
         '<div class="date">' + formatDate(s.date) + '</div>' +
-        '<span class="mode-badge">' + MODE_LABELS[s.mode] + '</span>' + incompleteBadge(s) + '</div>' +
+        '<span class="mode-badge">' + MODE_LABELS[s.mode] + '</span>' + templateBadge(s, store) + incompleteBadge(s) + '</div>' +
         '<div class="total-time">' + formatTime(s.totalTime) + '</div>' +
       '</div>';
     el.appendChild(card);
@@ -1606,10 +1902,12 @@ function showSessionDetail(id) {
   const sessions = getSessions();
   const s = sessions.find(x => x.id === id);
   if (!s) return;
+  const store = getTemplates();
   const el = document.getElementById('detail-content');
   let html = '<div class="card" style="text-align:center;margin-bottom:16px">' +
     '<div style="font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums">' + formatTime(s.totalTime) + '</div>' +
-    '<div style="color:var(--text-dim)">' + escapeText(s.taskName) + ' / ' + MODE_LABELS[s.mode] + '</div>' +
+    '<div style="color:var(--text-dim)">' + escapeText(s.taskName) + ' / ' + MODE_LABELS[s.mode] +
+      ' / ' + escapeText(sessionTemplateName(s, store)) + '</div>' +
     (s.completed === false ? '<div style="color:var(--warn);font-size:0.8rem;margin-top:4px">途中終了（ベスト・成長グラフの対象外）</div>' : '') +
     '<div style="color:var(--text-dim);font-size:0.8rem">' + formatDate(s.date) + '</div>' +
     (s.memo ? '<div style="margin-top:8px;font-size:0.9rem">' + escapeText(s.memo) + '</div>' : '') +
@@ -1630,9 +1928,34 @@ function showSessionDetail(id) {
     }
   });
   html += '</div>';
+
+  // 工程セットの付け替え。工程セット導入前の記録は全部「既定セット」に入るので、
+  // 後から「これはタイムトライアルの回だった」と振り分けられるようにしておく
+  const choices = templatesOfMode(store, s.mode);
+  if (choices.length > 1) {
+    html += '<div class="form-group"><label>工程セット</label>' +
+      '<select onchange="reassignSessionTemplate(\'' + s.id + '\', this.value)">' +
+      choices.map(t => '<option value="' + escapeAttr(t.id) + '"' +
+        (t.id === sessionTemplateId(s) ? ' selected' : '') + '>' + escapeText(t.name) + '</option>').join('') +
+      '</select>' +
+      '<p style="color:var(--text-dim);font-size:0.85rem;margin-top:6px">変更すると、この回のベストタイム・分析の集計先が変わります（工程のタイムは変わりません）。</p></div>';
+  }
+
   html += '<button class="btn btn-danger btn-sm" onclick="deleteSession(\'' + s.id + '\')">このセッションを削除</button>';
   el.innerHTML = html;
   showScreen('detail');
+}
+
+async function reassignSessionTemplate(id, templateId) {
+  const sessions = getSessions();
+  const s = sessions.find(x => x.id === id);
+  const tpl = findTemplate(templateId);
+  if (!s || !tpl || tpl.mode !== s.mode) return;
+  s.templateId = tpl.id;
+  s.templateName = tpl.name;
+  if (!saveSessions(sessions)) { await notify('この端末のブラウザに保存できませんでした。変更は反映されていません。', '保存に失敗しました'); return; }
+  recalcStats();
+  showSessionDetail(id);
 }
 
 async function deleteSession(id) {
@@ -1651,6 +1974,7 @@ let chartProgress = null, chartBreakdown = null;
 
 function renderAnalysis() {
   const sessions = getSessions();
+  const store = getTemplates();
   const modeFilter = document.getElementById('analysis-mode-filter').value;
   const taskSelect = document.getElementById('analysis-task-filter');
   const tasks = [...new Set(sessions.map(s => s.taskName))];
@@ -1665,6 +1989,9 @@ function renderAnalysis() {
   const taskFilter = taskSelect.value;
   let filtered = sessions;
   if (modeFilter) filtered = filtered.filter(s => s.mode === modeFilter);
+  // 工程セットの選択肢はモードで絞った後の記録から作る
+  const tplFilter = renderTemplateFilter('analysis-template-filter', filtered, store);
+  if (tplFilter) filtered = filtered.filter(s => sessionTemplateId(s) === tplFilter);
   if (taskFilter) filtered = filtered.filter(s => s.taskName === taskFilter);
 
   // 推移系グラフは完走した回のみ（途中終了が混ざると「急に速くなった」ように見えるため）
@@ -1712,6 +2039,14 @@ function renderProgressChart(sessions) {
   });
 }
 
+// 突き合わせキー → 表示名。同じ工程を後から改名していたら、いちばん新しい記録の名前を採る
+// （sessions は日付順に入っているので、後から上書きされるほうが新しい）
+function buildStepLabels(sessions) {
+  const labels = {};
+  sessions.forEach(s => { (s.steps || []).forEach(st => { labels[stepKey(st)] = st.name; }); });
+  return labels;
+}
+
 let breakdownSessions = [];
 function renderBreakdownChart(sessions) {
   breakdownSessions = sessions;
@@ -1719,32 +2054,34 @@ function renderBreakdownChart(sessions) {
   if (chartBreakdown) { chartBreakdown.destroy(); chartBreakdown = null; }
   toggleChartEmpty('chart-breakdown', 'breakdown-empty', sessions.length === 0);
   if (sessions.length === 0) return;
-  const allStepNames = sessions[sessions.length-1].steps.map(s => s.name);
+  // 工程は id で突き合わせる（工程名を変えても過去の記録と繋がるように）。表示名は最新の記録のものを使う
+  const stepLabels = buildStepLabels(sessions);
+  const allStepKeys = sessions[sessions.length-1].steps.map(st => stepKey(st));
   const select = document.getElementById('breakdown-step-filter');
   const prevVal = select.value;
   select.innerHTML = '<option value="">全工程</option>';
-  allStepNames.forEach((name, i) => {
+  allStepKeys.forEach((key, i) => {
     const opt = document.createElement('option');
-    opt.value = name; opt.textContent = (i+1) + '. ' + name;
-    if (name === prevVal) opt.selected = true;
+    opt.value = key; opt.textContent = (i+1) + '. ' + stepLabels[key];
+    if (key === prevVal) opt.selected = true;
     select.appendChild(opt);
   });
-  const filterName = select.value;
-  const isAll = !filterName;
-  const showNames = isAll ? allStepNames : [filterName];
-  const colors = generateColors(allStepNames.length);
+  const filterKey = select.value;
+  const isAll = !filterKey;
+  const showKeys = isAll ? allStepKeys : [filterKey];
+  const colors = generateColors(allStepKeys.length);
   const labels = sessions.map(s => formatDateShort(s.date));
   const scalesY = { beginAtZero: true, ticks: { color: '#8b8d98', callback: v => v + '分' }, grid: { color: '#2a2d3a' } };
   const scalesX = { ticks: { color: '#8b8d98', maxRotation: 45 }, grid: { display: false } };
 
   if (isAll) {
-    const datasets = showNames.map((name, i) => ({
-      label: name,
+    const datasets = showKeys.map(key => ({
+      label: stepLabels[key],
       data: sessions.map(s => {
-        const st = s.steps.find(x => x.name === name);
+        const st = s.steps.find(x => stepKey(x) === key);
         return st ? Math.round(st.actualTime / 60) : 0;
       }),
-      backgroundColor: colors[allStepNames.indexOf(name)]
+      backgroundColor: colors[allStepKeys.indexOf(key)]
     }));
     chartBreakdown = new Chart(ctx, {
       type: 'bar',
@@ -1756,11 +2093,11 @@ function renderBreakdownChart(sessions) {
       }
     });
   } else {
-    const idx = allStepNames.indexOf(filterName);
+    const idx = allStepKeys.indexOf(filterKey);
     const datasets = [{
-      label: filterName,
+      label: stepLabels[filterKey],
       data: sessions.map(s => {
-        const st = s.steps.find(x => x.name === filterName);
+        const st = s.steps.find(x => stepKey(x) === filterKey);
         return st ? Math.round(st.actualTime / 60) : 0;
       }),
       borderColor: colors[idx],
@@ -1786,15 +2123,18 @@ function updateBreakdownVisibility() {
 function renderCompare(sessions) {
   const el = document.getElementById('compare-content');
   if (sessions.length === 0) { el.innerHTML = '<div class="empty-state">データなし</div>'; return; }
+  const stepLabels = buildStepLabels(sessions);
   const stepMap = {};
   sessions.forEach(s => {
     s.steps.forEach(st => {
-      if (!stepMap[st.name]) stepMap[st.name] = [];
-      stepMap[st.name].push(st.actualTime);
+      const k = stepKey(st);
+      if (!stepMap[k]) stepMap[k] = [];
+      stepMap[k].push(st.actualTime);
     });
   });
   let html = '';
-  Object.entries(stepMap).forEach(([name, times]) => {
+  Object.entries(stepMap).forEach(([key, times]) => {
+    const name = stepLabels[key];
     const avg = times.reduce((a,b)=>a+b,0)/times.length;
     const min = Math.min(...times);
     const max = Math.max(...times);
@@ -1812,17 +2152,20 @@ function renderCompare(sessions) {
 function renderRatingAnalysis(sessions) {
   const el = document.getElementById('rating-content');
   if (sessions.length === 0) { el.innerHTML = '<div class="empty-state">データなし</div>'; return; }
+  const stepLabels = buildStepLabels(sessions);
   const stepMap = {};
   sessions.forEach(s => {
     s.steps.forEach(st => {
-      if (!stepMap[st.name]) stepMap[st.name] = { good: 0, bad: 0, total: 0 };
-      if (st.rating === 'good') { stepMap[st.name].good++; stepMap[st.name].total++; }
-      else if (st.rating === 'bad') { stepMap[st.name].bad++; stepMap[st.name].total++; }
+      const k = stepKey(st);
+      if (!stepMap[k]) stepMap[k] = { good: 0, bad: 0, total: 0 };
+      if (st.rating === 'good') { stepMap[k].good++; stepMap[k].total++; }
+      else if (st.rating === 'bad') { stepMap[k].bad++; stepMap[k].total++; }
     });
   });
   let html = '';
-  Object.entries(stepMap).forEach(([name, data]) => {
+  Object.entries(stepMap).forEach(([key, data]) => {
     if (data.total === 0) return;
+    const name = stepLabels[key];
     const goodRate = Math.round((data.good / data.total) * 100);
     const isBadHeavy = data.bad > data.good;
     html += '<div class="card" style="margin-bottom:8px;' + (isBadHeavy?'border-left:3px solid var(--bad)':'') + '">' +
@@ -1851,11 +2194,168 @@ function switchAnalysisTab(tab, btn) {
 // 9. Settings
 // ========================================
 let editingSteps = [];
-function renderStepEditor() {
+let editingTemplateId = '';
+let editingBaseline = '';
+
+// 編集中の内容を文字列化して控える。切り替え時に「保存していない変更」を検出するために使う
+function stepEditorSnapshot() {
+  return JSON.stringify({ name: document.getElementById('template-name').value, steps: editingSteps });
+}
+function isStepEditorDirty() { return stepEditorSnapshot() !== editingBaseline; }
+
+// 選んだモードの工程セット一覧を作り直し、対象のセットを編集欄に読み込む
+function renderSettingsTemplateSelect(preferId) {
   const mode = document.getElementById('settings-mode').value;
-  const templates = getTemplates();
-  editingSteps = JSON.parse(JSON.stringify(templates[mode]));
+  const store = getTemplates();
+  const select = document.getElementById('settings-template');
+  const list = templatesOfMode(store, mode);
+  const target = (preferId && list.some(t => t.id === preferId)) ? preferId : getActiveTemplate(mode, store).id;
+  select.innerHTML = '';
+  list.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id; opt.textContent = t.name;
+    if (t.id === target) opt.selected = true;
+    select.appendChild(opt);
+  });
+  // モードごとに最低1本は必要なので、最後の1本は消せない
+  document.getElementById('btn-delete-template').disabled = list.length <= 1;
+  hideTemplateAddPanel();
+  loadTemplateIntoEditor(target, store);
+}
+
+function loadTemplateIntoEditor(id, store) {
+  store = store || getTemplates();
+  const tpl = findTemplate(id, store);
+  if (!tpl) return;
+  editingTemplateId = tpl.id;
+  editingSteps = JSON.parse(JSON.stringify(tpl.steps));
+  document.getElementById('template-name').value = tpl.name;
   renderStepEditorList();
+  editingBaseline = stepEditorSnapshot();
+}
+
+const DISCARD_MSG = '保存していない変更があります。破棄して切り替えますか？';
+
+async function onSettingsModeChange() {
+  if (isStepEditorDirty() && !await askConfirm(DISCARD_MSG, '破棄して切り替える')) {
+    const tpl = findTemplate(editingTemplateId);
+    if (tpl) document.getElementById('settings-mode').value = tpl.mode;
+    return;
+  }
+  renderSettingsTemplateSelect();
+}
+
+async function onSettingsTemplateChange() {
+  const select = document.getElementById('settings-template');
+  const next = select.value;
+  if (isStepEditorDirty() && !await askConfirm(DISCARD_MSG, '破棄して切り替える')) {
+    select.value = editingTemplateId;
+    return;
+  }
+  hideTemplateAddPanel();
+  loadTemplateIntoEditor(next);
+}
+
+// ---- 工程セットの追加・削除 ----
+
+function hideTemplateAddPanel() {
+  document.getElementById('template-add-panel').style.display = 'none';
+}
+
+function showTemplateAddPanel() {
+  const mode = document.getElementById('settings-mode').value;
+  const base = document.getElementById('template-add-base');
+  base.innerHTML = '';
+  const opts = [
+    { value: 'copy', label: 'いま選んでいるセットを複製' },
+    { value: 'default', label: '既定の工程' }
+  ];
+  (PRESET_TEMPLATES[mode] || []).forEach((p, i) => opts.push({ value: 'preset:' + i, label: p.name }));
+  opts.push({ value: 'empty', label: '空（工程1つだけ）' });
+  opts.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.value; opt.textContent = o.label;
+    base.appendChild(opt);
+  });
+  document.getElementById('template-add-panel').style.display = '';
+  onTemplateBaseChange();
+}
+
+function presetOf(mode, value) {
+  if (value.indexOf('preset:') !== 0) return null;
+  return (PRESET_TEMPLATES[mode] || [])[parseInt(value.slice(7), 10)] || null;
+}
+
+function templateBaseSteps(mode, value, store) {
+  if (value === 'default') return JSON.parse(JSON.stringify(DEFAULT_TEMPLATES[mode]));
+  if (value === 'empty') return [{ id: newStepId(), name: '新規工程', targetTime: 600 }];
+  const preset = presetOf(mode, value);
+  if (preset) return JSON.parse(JSON.stringify(preset.steps));
+  const cur = findTemplate(document.getElementById('settings-template').value, store);
+  return cur ? JSON.parse(JSON.stringify(cur.steps)) : null;
+}
+
+function templateBaseName(mode, value, store) {
+  if (value === 'default') return DEFAULT_TEMPLATE_NAMES[mode];
+  if (value === 'empty') return '新しい工程セット';
+  const preset = presetOf(mode, value);
+  if (preset) return preset.name;
+  const cur = findTemplate(document.getElementById('settings-template').value, store);
+  return cur ? cur.name + ' のコピー' : '新しい工程セット';
+}
+
+// 同じ名前が並ぶと選択肢で見分けが付かないので、末尾に番号を足して一意にする
+function uniqueTemplateName(name, mode, store) {
+  const used = templatesOfMode(store, mode).map(t => t.name);
+  if (used.indexOf(name) === -1) return name;
+  let i = 2;
+  while (used.indexOf(name + ' ' + i) !== -1) i++;
+  return name + ' ' + i;
+}
+
+function onTemplateBaseChange() {
+  const mode = document.getElementById('settings-mode').value;
+  const store = getTemplates();
+  const value = document.getElementById('template-add-base').value;
+  document.getElementById('template-add-name').value =
+    uniqueTemplateName(templateBaseName(mode, value, store), mode, store);
+}
+
+async function createTemplate() {
+  const mode = document.getElementById('settings-mode').value;
+  const store = getTemplates();
+  const name = document.getElementById('template-add-name').value.trim();
+  if (!name) { notify('工程セットの名前を入力してください。'); return; }
+  const steps = templateBaseSteps(mode, document.getElementById('template-add-base').value, store);
+  if (!steps || steps.length === 0) { notify('下敷きにする工程を取得できませんでした。'); return; }
+  const tpl = { id: newTemplateId(), mode: mode, name: name, steps: dedupeStepIds(steps) };
+  store.list.push(tpl);
+  // 追加したセットをそのまま使えるように、使用中の指定も移す
+  store.active[mode] = tpl.id;
+  if (!saveTemplates(store)) { await notify('この端末のブラウザに保存できませんでした。', '保存に失敗しました'); return; }
+  renderSettingsTemplateSelect(tpl.id);
+  notify('「' + name + '」を追加しました。開始画面でこのセットが選ばれます。');
+}
+
+async function deleteTemplate() {
+  const mode = document.getElementById('settings-mode').value;
+  const store = getTemplates();
+  const id = document.getElementById('settings-template').value;
+  if (templatesOfMode(store, mode).length <= 1) {
+    notify('このモードの工程セットは1つしかないため削除できません。');
+    return;
+  }
+  const tpl = findTemplate(id, store);
+  if (!tpl) return;
+  const used = getSessions().filter(s => sessionTemplateId(s) === id).length;
+  const msg = '「' + tpl.name + '」を削除しますか？' +
+    (used ? '\n\nこのセットで計測した記録が' + used + '件あります。記録そのものは消えませんが、ホームの回数・ベストタイムの集計から外れます。' : '');
+  if (!await askConfirm(msg, '削除する')) return;
+  store.list = store.list.filter(t => t.id !== id);
+  if (store.active[mode] === id) store.active[mode] = templatesOfMode(store, mode)[0].id;
+  if (!saveTemplates(store)) { await notify('この端末のブラウザに保存できませんでした。', '保存に失敗しました'); return; }
+  recalcStats();
+  renderSettingsTemplateSelect();
 }
 
 function renderStepEditorList() {
@@ -1887,13 +2387,18 @@ function setStepTime(idx, val) {
   updateStepTotal();
 }
 
+// 390分の警告は「フルモードの既定セット」だけに出す。
+// 自分で追加したセット（大枠6工程・部分練習など）で赤くしても意味がないため
+function isFullDefaultTemplate() {
+  return editingTemplateId === defaultTemplateId('full');
+}
+
 function updateStepTotal() {
-  const mode = document.getElementById('settings-mode').value;
   const totalEl = document.getElementById('step-editor-total');
   const totalMin = editingSteps.reduce((sum, s) => sum + Math.round(s.targetTime / 60), 0);
   totalEl.style.display = '';
   totalEl.textContent = '合計: ' + totalMin + '分（' + formatDuration(totalMin * 60) + '）';
-  totalEl.style.color = (mode === 'full' && totalMin !== 390) ? 'var(--bad)' : 'var(--text)';
+  totalEl.style.color = (isFullDefaultTemplate() && totalMin !== 390) ? 'var(--bad)' : 'var(--text)';
 }
 
 function setupDrag(el, idx) {
@@ -1912,7 +2417,7 @@ function setupDrag(el, idx) {
 }
 
 function addStep() {
-  editingSteps.push({ name: '新規工程', targetTime: 600 });
+  editingSteps.push({ id: newStepId(), name: '新規工程', targetTime: 600 });
   renderStepEditorList();
 }
 
@@ -1922,24 +2427,29 @@ function removeStep(idx) {
 }
 
 async function saveSteps() {
-  const mode = document.getElementById('settings-mode').value;
+  const store = getTemplates();
+  const tpl = findTemplate(editingTemplateId, store);
+  if (!tpl) { notify('編集中の工程セットが見つかりません。設定画面を開き直してください。'); return; }
+  const name = document.getElementById('template-name').value.trim();
+  if (!name) { notify('工程セットの名前を入力してください。'); return; }
   if (editingSteps.length === 0) { notify('工程が1つもありません。1つ以上追加してください。'); return; }
   editingSteps.forEach(s => { s.name = String(s.name || '').trim(); });
   if (editingSteps.some(s => !s.name)) { notify('工程名が空の項目があります。名前を入力してください。'); return; }
-  if (mode === 'full') {
+  if (isFullDefaultTemplate()) {
     const totalMin = editingSteps.reduce((sum, s) => sum + Math.round(s.targetTime / 60), 0);
     if (totalMin !== 390) {
       if (!await askConfirm('合計が' + totalMin + '分です（目標: 390分）。このまま保存しますか？', '保存する')) return;
     }
   }
-  const templates = getTemplates();
-  templates[mode] = editingSteps;
-  saveTemplates(templates);
+  tpl.name = name;
+  tpl.steps = dedupeStepIds(editingSteps);
+  if (!saveTemplates(store)) { await notify('この端末のブラウザに保存できませんでした。', '保存に失敗しました'); return; }
+  renderSettingsTemplateSelect(tpl.id);
   notify('保存しました');
 }
 
 async function resetStepsToDefault() {
-  if (!await askConfirm('デフォルトの工程に戻しますか？', '戻す')) return;
+  if (!await askConfirm('この工程セットの内容を、既定の工程に戻しますか？（「保存」を押すまで反映されません）', '戻す')) return;
   const mode = document.getElementById('settings-mode').value;
   editingSteps = JSON.parse(JSON.stringify(DEFAULT_TEMPLATES[mode]));
   renderStepEditorList();
@@ -2047,8 +2557,11 @@ function importJSON(event) {
       // 工程テンプレートは形式を確認できたものだけ取り込む（壊れていてもセッションは活かす）
       let note = '';
       if (data.templates) {
-        if (validateTemplates(data.templates)) saveTemplates(data.templates);
-        else note = '\n（工程テンプレートは形式が不正なため取り込みませんでした）';
+        // v1.2.0 以前に書き出したバックアップは旧形式なので、取り込むときに移行する
+        let t = data.templates;
+        if (!validateTemplates(t) && !t.version) t = migrateTemplatesV1(t);
+        if (validateTemplates(t)) saveTemplates(t);
+        else note = '\n（工程セットは形式が不正なため取り込みませんでした）';
       }
       recalcStats();
       notify(newSessions.length + '件のセッションをインポートしました' + note);
@@ -2082,7 +2595,8 @@ function exportCSV() {
   const sessions = getSessions();
   if (sessions.length === 0) { notify('エクスポートするデータがありません'); return; }
   const BOM = '\uFEFF';
-  const headers = ['実施日','課題名','モード','工程番号','工程名','目標時間(分)','実績時間(分)','評価','メモ','合計時間(分)'];
+  const store = getTemplates();
+  const headers = ['実施日','課題名','モード','工程セット','工程番号','工程名','目標時間(分)','実績時間(分)','評価','メモ','合計時間(分)'];
   let csv = BOM + headers.join(',') + '\n';
   sessions.forEach(s => {
     s.steps.forEach((st, i) => {
@@ -2090,6 +2604,7 @@ function exportCSV() {
         formatDate(s.date),
         csvEscape(s.taskName),
         MODE_LABELS[s.mode],
+        csvEscape(sessionTemplateName(s, store)),
         i + 1,
         csvEscape(st.name),
         Math.round(st.targetTime / 60),
@@ -2130,11 +2645,10 @@ async function confirmResetAll() {
 // ========================================
 // 11. Gamification
 // ========================================
-function showBestTime(time, mode) {
+function showBestTime(time, label) {
   const el = document.getElementById('best-time-overlay');
   document.getElementById('best-time-message').textContent = 'ベストタイム更新!';
-  document.getElementById('best-time-detail').textContent =
-    MODE_LABELS[mode] + 'モード: ' + formatTime(time);
+  document.getElementById('best-time-detail').textContent = label + ': ' + formatTime(time);
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 4000);
 }
@@ -2229,10 +2743,34 @@ function restoreClockStart() {
   document.getElementById('setup-clock').value = saved;
 }
 
+// モードを変えたら、そのモードで使用中の工程セットを選び直してから一覧を作り直す
+function onSetupModeChange() {
+  renderSetupTemplateSelect();
+  updateSetupPreview();
+}
+
+// 工程セットの選択肢を、選んだモードのものだけで作り直す
+function renderSetupTemplateSelect() {
+  const mode = document.getElementById('setup-mode').value;
+  const store = getTemplates();
+  const select = document.getElementById('setup-template');
+  const active = getActiveTemplate(mode, store);
+  select.innerHTML = '';
+  templatesOfMode(store, mode).forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    if (t.id === active.id) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
 function updateSetupPreview() {
   const mode = document.getElementById('setup-mode').value;
-  const templates = getTemplates();
-  const steps = templates[mode];
+  const store = getTemplates();
+  const tpl = findTemplate(document.getElementById('setup-template').value, store) ||
+              getActiveTemplate(mode, store);
+  const steps = tpl.steps;
   const el = document.getElementById('setup-preview');
   const total = steps.reduce((a,s) => a + s.targetTime, 0);
   const clockStart = parseClockInput(document.getElementById('setup-clock').value);
@@ -2281,6 +2819,16 @@ document.addEventListener('keydown', function(e) {
 // ========================================
 // Init
 // ========================================
+// 旧形式の保存データを起動時に1度だけ整える（毎回変換し直さないため）
+(function migrateStoredData() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(STORAGE_KEYS.templates)); } catch {}
+  // v1 の工程テンプレート（モードごとに1本・工程名だけ）を v2 の工程セットへ書き戻す
+  if (raw === null || !validateTemplates(raw)) saveTemplates(getTemplates());
+  // ベストタイムの集計単位をモードから工程セットへ変えたので、古い形式は作り直す
+  if (getStats().version !== 2) recalcStats();
+})();
+
 loadThemeColor();
 restoreClockStart();
 document.getElementById('help-version').textContent = 'v' + APP_VERSION + '（' + APP_VERSION_DATE + '）';

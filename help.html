@@ -335,6 +335,7 @@ footer a { color: var(--accent); text-decoration: none; }
     <div class="card">
       <h3>練習回数・ベストタイム・前回タイム</h3>
       <p>モードごとの練習回数、ベストタイム、前回タイムを表示します。セッションを重ねるほど数値が蓄積されます。</p>
+      <p style="margin-top:8px">工程セットを複数持っているモードでは、<strong>いま使用中の工程セット</strong>の数字を表示します（60分の部分練習と180分の通し練習が同じ枠で混ざらないようにするためです）。使用中のセット名は数値の下に表示されます。</p>
     </div>
     <div class="card">
       <h3>メニュー</h3>
@@ -384,6 +385,16 @@ footer a { color: var(--accent); text-decoration: none; }
         </div>
       </div>
       <div class="tip">モードを変えると工程一覧と目標時間が切り替わります。工程は設定画面でカスタマイズ可能です。</div>
+    </div>
+    <div class="card">
+      <h3>工程セット</h3>
+      <p>同じモードの中に工程の組み合わせを複数持てます。作図モードなら「本番想定（180分・19工程）」と「作図タイムトライアル（60分・5工程）」を並べておき、練習の種類に応じて切り替えられます。</p>
+      <ul>
+        <li>選んだセットの工程・目標時間で計測します</li>
+        <li>選んだセットは次回も引き継がれます</li>
+        <li>セットの追加・編集は<strong>設定 → 工程カスタマイズ</strong>から</li>
+      </ul>
+      <div class="tip">回数・ベストタイム・成長グラフはセットごとに集計されるので、60分の部分練習を挟んでも通し練習のベストタイムは崩れません。</div>
     </div>
     <div class="card">
       <h3>本番の開始時刻（任意）</h3>
@@ -508,8 +519,19 @@ footer a { color: var(--accent); text-decoration: none; }
       <ul style="margin-top:8px">
         <li>「＋ 工程追加」で新しい工程を追加</li>
         <li>「デフォルトに戻す」で初期設定に戻す</li>
-        <li>「保存」で反映（フルモードは合計390分になるよう確認が入ります）</li>
+        <li>「保存」で反映（フルモードの既定セットは合計390分になるよう確認が入ります）</li>
       </ul>
+    </div>
+    <div class="card">
+      <h3>工程セット</h3>
+      <p>1つのモードの中に、工程の組み合わせを複数持てます。たとえば作図モードに「本番想定（180分・19工程）」と「作図タイムトライアル（60分・5工程）」を並べておき、開始画面で切り替えて使えます。毎回工程を書き換える必要はありません。</p>
+      <ul style="margin-top:8px">
+        <li>「＋ セットを追加」で新しいセットを作成。下敷きは<strong>いま選んでいるセットの複製 / 既定の工程 / プリセット / 空</strong>から選べます</li>
+        <li>セット名は編集欄でそのまま書き換えて「保存」</li>
+        <li>練習回数・ベストタイム・成長グラフは<strong>セットごとに集計</strong>します</li>
+        <li>セットを削除しても、そのセットで計測した記録は残ります（履歴・分析から参照できます）</li>
+      </ul>
+      <p style="margin-top:8px">工程には内部的に固有の番号が付いており、<strong>工程名を変えても過去の記録と繋がったまま</strong>分析されます。工程セットを追加する前の記録は、そのモードの既定セットの記録として扱われます。別のセットの記録として集計し直したい場合は、履歴からその回を開いて「工程セット」を選び直してください。</p>
     </div>
     <div class="card">
       <h3>テーマカラー</h3>
@@ -562,6 +584,17 @@ footer a { color: var(--accent); text-decoration: none; }
       <h2>更新履歴</h2>
     </div>
     <div class="card">
+      <h3>v1.3.0 &mdash; 2026-08-12</h3>
+      <ul>
+        <li>工程の組み合わせを<strong>「工程セット」として複数保存</strong>できるようにしました。開始画面で切り替えて使えます</li>
+        <li><strong>作図タイムトライアル（60分）</strong>などのプリセットから、すぐにセットを追加できるようにしました</li>
+        <li>練習回数・ベストタイム・分析を<strong>工程セットごとに集計</strong>するようにしました</li>
+        <li>工程名を変えても、<strong>過去の記録と繋がったまま</strong>分析されるようにしました</li>
+        <li>履歴・分析に工程セットの絞り込みを追加しました</li>
+        <li>履歴からその回の工程セットを選び直せるようにしました</li>
+      </ul>
+    </div>
+    <div class="card">
       <h3>v1.2.0 &mdash; 2026-08-08</h3>
       <ul>
         <li><strong>本番の開始時刻</strong>を設定できるようにしました（セッション設定）</li>
@@ -593,7 +626,7 @@ footer a { color: var(--accent); text-decoration: none; }
 
   <footer>
     <p>製図時間管理ツール &mdash; 一級建築士製図試験用</p>
-    <p style="margin-top:4px">v1.2.0（2026-08-08）</p>
+    <p style="margin-top:4px">v1.3.0（2026-08-12）</p>
     <p style="margin-top:6px"><a href="index.html">アプリを開く</a> &nbsp;|&nbsp; <a href="https://github.com/shinji-kivi/seizu-timer" target="_blank" rel="noopener">GitHub</a></p>
   </footer>
 
