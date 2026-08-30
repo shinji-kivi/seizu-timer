@@ -336,6 +336,7 @@ footer a { color: var(--accent); text-decoration: none; }
       <h3>練習回数・ベストタイム・前回タイム</h3>
       <p>モードごとの練習回数、ベストタイム、前回タイムを表示します。セッションを重ねるほど数値が蓄積されます。</p>
       <p style="margin-top:8px">工程セットを複数持っているモードでは、<strong>いま使用中の工程セット</strong>の数字を表示します（60分の部分練習と180分の通し練習が同じ枠で混ざらないようにするためです）。使用中のセット名は数値の下に表示されます。</p>
+      <div class="tip"><strong>タイルを押すと、そのモードで新規セッションを始められます。</strong>モードが選ばれた状態でセッション設定が開くので、「新規セッション」から入ってモードを選び直す手間が省けます。</div>
     </div>
     <div class="card">
       <h3>メニュー</h3>
@@ -434,6 +435,7 @@ footer a { color: var(--accent); text-decoration: none; }
         <li><span class="tag">一時停止</span> タイマーを一時停止。再度押すと再開。</li>
         <li><span class="tag tag-bad">終了</span> 現在の工程を最後として振り返りへ進む。</li>
       </ul>
+      <div class="tip"><strong>「完了」と「終了」は確認のダイアログが出ます。</strong>誤って2回押しても計測が終わらないようにするためです。確認している間に過ぎた時間は記録に加算しません（押した時点の時間で確定します）。途中の「次の工程へ」には確認を出しません（押す回数が多く、押し間違いは「1つ戻す」で取り消せるため）。</div>
       <div class="tip">PCキーボードショートカット：<span class="kbd">Enter</span> = 次の工程 ／ <span class="kbd">Space</span> = 一時停止 ／ <span class="kbd">BackSpace</span> = 1つ戻す</div>
     </div>
     <div class="card">
@@ -585,6 +587,13 @@ footer a { color: var(--accent); text-decoration: none; }
       <h2>更新履歴</h2>
     </div>
     <div class="card">
+      <h3>v1.5.0 &mdash; 2026-08-31</h3>
+      <ul>
+        <li>ホーム画面の<strong>4つのタイル（エスキス / 記述 / 作図 / フル）を押しても新規セッションを始められる</strong>ようにしました。タイルから入るとそのモードが選ばれた状態で開きます</li>
+        <li><strong>「完了」「終了」を押したときに確認</strong>が出るようにしました。誤って2回押しても計測が終わりません</li>
+      </ul>
+    </div>
+    <div class="card">
       <h3>v1.4.0 &mdash; 2026-08-12</h3>
       <ul>
         <li>記録が10件たまるごとに、<strong>ホーム画面でバックアップをおすすめする</strong>ようにしました</li>
@@ -634,7 +643,7 @@ footer a { color: var(--accent); text-decoration: none; }
 
   <footer>
     <p>製図時間管理ツール &mdash; 一級建築士製図試験用</p>
-    <p style="margin-top:4px">v1.4.0（2026-08-12）</p>
+    <p style="margin-top:4px">v1.5.0（2026-08-31）</p>
     <p style="margin-top:6px"><a href="index.html">アプリを開く</a> &nbsp;|&nbsp; <a href="https://github.com/shinji-kivi/seizu-timer" target="_blank" rel="noopener">GitHub</a></p>
   </footer>
 

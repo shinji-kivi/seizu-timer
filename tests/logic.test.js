@@ -77,7 +77,8 @@ const EXPORTED = [
   'buildStepLabels', 'renderCompare', 'renderRatingAnalysis', 'validateImport',
   'saveSession', 'lap', 'finishSession',
   'BACKUP_NOTICE_EVERY', 'getBackupBaseline', 'setBackupBaseline', 'shouldNoticeBackup',
-  'renderBackupNotice', 'dismissBackupNotice', 'renderHome'
+  'renderBackupNotice', 'dismissBackupNotice', 'renderHome',
+  'startSetupWithMode', 'confirmFinish', 'askFinishConfirm'
 ];
 
 function extractScript() {
@@ -122,11 +123,15 @@ function loadApp(seed) {
   vm.createContext(ctx);
   const tail = '\nglobalThis.__app = { ' +
     EXPORTED.map(n => n + ': ' + n).join(', ') +
-    ', setTimerState: (s) => { timerState = s; } };\n';
+    ', setTimerState: (s) => { timerState = s; }, getTimerState: () => timerState };\n';
   vm.runInContext(SCRIPT_BODY + tail, ctx, { filename: 'index.html<script>' });
   const app = ctx.__app;
   app._els = els;
   app._storage = ctx.localStorage;
+  // 確認ダイアログを差し替えるために context 自体を渡す。
+  // top-level の function 宣言は const/let と違って context のプロパティになるので、
+  // ctx.askConfirm を上書きすれば呼び出し側（lap など）から見えるものも入れ替わる
+  app._ctx = ctx;
   return app;
 }
 
@@ -145,6 +150,10 @@ function test(name, fn) {
     failures.push({ name, message: e && e.message ? e.message : String(e) });
   }
 }
+// 確認ダイアログを挟む処理は非同期なので、末尾でまとめて await する
+const asyncTests = [];
+function testAsync(name, fn) { asyncTests.push({ name, fn }); }
+
 function ok(cond, msg) {
   if (!cond) throw new Error(msg || '条件が成立しませんでした');
 }
@@ -592,12 +601,103 @@ test('validateImport は工程 id の無い旧バックアップも受け付け�
   ok(!app.validateImport({}));
 });
 
+// ================================================================ 8. ホームのタイルから開始（v1.5.0）
+
+test('ホームのタイルを押すと、そのモードを選んだ状態でセッション設定が開く', () => {
+  const app = loadApp();
+  app.startSetupWithMode('drawing');
+  eq(app._els['setup-mode'].value, 'drawing');
+  app.startSetupWithMode('writing');
+  eq(app._els['setup-mode'].value, 'writing');
+});
+
+test('存在しないモードを渡してもモードの選択を書き換えない', () => {
+  const app = loadApp();
+  app.startSetupWithMode('full');
+  app.startSetupWithMode('unknown');
+  eq(app._els['setup-mode'].value, 'full');
+});
+
+// ================================================================ 9. 完了・終了の確認（v1.5.0）
+
+// 3工程・最終工程まで進めた状態を作る
+function timerAtLastStep(app) {
+  const tpl = app.findTemplate('tpl_drawing_default');
+  app.setTimerState({
+    running: true, paused: false, mode: 'drawing',
+    templateId: tpl.id, templateName: tpl.name,
+    taskName: '課題E', memo: '', steps: JSON.parse(JSON.stringify(tpl.steps.slice(0, 3))),
+    currentStep: 2, totalElapsed: 1000, stepElapsed: 300,
+    intervalId: null, laps: [
+      { id: 's_area', name: '面積表', targetTime: 240, actualTime: 250, rating: null, memo: '' },
+      { id: 's_grid', name: '通り心', targetTime: 360, actualTime: 450, rating: null, memo: '' }
+    ], clockStart: null
+  });
+  return app;
+}
+
+testAsync('最終工程の「完了」をキャンセルすると計測が続く', async () => {
+  const app = timerAtLastStep(loadApp());
+  app._ctx.askConfirm = () => Promise.resolve(false);
+  await app.lap();
+  const st = app.getTimerState();
+  ok(st.running, '計測が止まってしまった');
+  eq(st.laps.length, 2, 'キャンセルしたのに工程が記録された');
+});
+
+testAsync('最終工程の「完了」を承認すると完走として確定する', async () => {
+  const app = timerAtLastStep(loadApp());
+  app._ctx.askConfirm = () => Promise.resolve(true);
+  await app.lap();
+  const st = app.getTimerState();
+  ok(!st.running, '計測が止まっていない');
+  ok(st.completed, '完走として記録されていない');
+  eq(st.laps.length, 3);
+  eq(st.laps[2].id, 's_column');
+});
+
+testAsync('確認している間に過ぎた時間は記録に加算しない', async () => {
+  const app = timerAtLastStep(loadApp());
+  // ダイアログを開いている間もタイマーは進む。その状況を作ってから OK を返す
+  app._ctx.askConfirm = () => {
+    const st = app.getTimerState();
+    st.totalElapsed += 8;
+    st.stepElapsed += 8;
+    return Promise.resolve(true);
+  };
+  await app.lap();
+  const st = app.getTimerState();
+  eq(st.totalElapsed, 1000, '確認中の時間が合計に乗った');
+  eq(st.laps[2].actualTime, 300, '確認中の時間が最終工程の実績に乗った');
+});
+
+testAsync('「終了」もキャンセルできる。承認すると途中終了として記録する', async () => {
+  const cancelled = timerAtLastStep(loadApp());
+  cancelled._ctx.askConfirm = () => Promise.resolve(false);
+  await cancelled.confirmFinish();
+  ok(cancelled.getTimerState().running, 'キャンセルしたのに終了した');
+
+  const app = timerAtLastStep(loadApp());
+  app._ctx.askConfirm = () => Promise.resolve(true);
+  await app.confirmFinish();
+  const st = app.getTimerState();
+  ok(!st.running, '終了していない');
+  eq(st.completed, false, '「終了」経由なのに完走扱いになっている');
+});
+
 // ---------------------------------------------------------------- 実行結果
 
-const total = passed + failures.length;
-if (failures.length) {
-  console.log('\n失敗 ' + failures.length + ' / ' + total + '\n');
-  failures.forEach(f => console.log('  x ' + f.name + '\n    ' + f.message));
-  process.exit(1);
-}
-console.log('全 ' + total + ' 件 成功');
+(async () => {
+  for (const t of asyncTests) {
+    currentTest = t.name;
+    try { await t.fn(); passed++; }
+    catch (e) { failures.push({ name: t.name, message: e && e.message ? e.message : String(e) }); }
+  }
+  const total = passed + failures.length;
+  if (failures.length) {
+    console.log('\n失敗 ' + failures.length + ' / ' + total + '\n');
+    failures.forEach(f => console.log('  x ' + f.name + '\n    ' + f.message));
+    process.exit(1);
+  }
+  console.log('全 ' + total + ' 件 成功');
+})();

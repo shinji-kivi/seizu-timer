@@ -370,10 +370,18 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 .home-stats {
   display:flex; gap:12px; flex-wrap:wrap;
 }
+/* タップするとそのモードでセッション設定へ進むため button で作る。
+   button の既定スタイル（枠線・フォント・文字色）を打ち消して従来の見た目に揃える */
 .home-stat {
   background:var(--bg-card); border-radius:var(--radius); padding:20px 12px;
   flex:1; min-width:0; text-align:center;
+  border:none; color:inherit; font:inherit;
+  cursor:pointer; transition:all 0.15s; -webkit-appearance:none; appearance:none;
 }
+/* 枠線は border ではなく inset の影で描く。
+   border だとタイル4枚で計16px 高くなり、短い画面（320x568 等）でホームがはみ出すため */
+.home-stat:hover { box-shadow:inset 0 0 0 2px var(--accent); transform:translateY(-2px); }
+.home-stat:active { transform:translateY(0); }
 .home-stat .value { font-size:2.8rem; font-weight:700; color:var(--accent); }
 .home-stat .label { font-size:0.9rem; color:var(--text-dim); margin-top:6px; }
 .home-stat .best-time {
@@ -569,7 +577,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <div class="timer-controls" style="margin-top:8px">
       <button class="btn btn-outline" id="btn-undo" style="flex:1" onclick="undoLap()">1つ戻す<br><span class="key-hint-inline">BS</span></button>
       <button class="btn btn-outline" id="btn-pause" style="flex:1" onclick="togglePause()">一時停止<br><span class="key-hint-inline">Space</span></button>
-      <button class="btn btn-danger" id="btn-finish" style="flex:1" onclick="finishSession()">終了</button>
+      <button class="btn btn-danger" id="btn-finish" style="flex:1" onclick="confirmFinish()">終了</button>
     </div>
   </div>
 </div>
@@ -763,6 +771,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card">
     <h3 style="margin-bottom:12px">セッションを始める</h3>
     <div style="font-size:0.9rem;line-height:1.8">
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:6px">ホーム画面の「新規セッション」のほか、上に並んだ<strong>4つのタイル（エスキス / 記述 / 作図 / フル）を押しても始められます</strong>。タイルから入るとそのモードが選ばれた状態になります。</p>
       <p><strong>① 課題名</strong>を入力（例：課題No.3 福祉施設）</p>
       <p><strong>② モード</strong>を選択</p>
       <div style="margin-left:12px;color:var(--text-dim);font-size:0.85rem">
@@ -791,7 +800,9 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <p><strong>次の工程へ</strong>：現在の工程を記録して次へ進む</p>
       <p><strong>1つ戻す</strong>：押し間違えたとき、直前のラップを取り消して前の工程に戻る</p>
       <p><strong>一時停止</strong>：タイマーを止める（再開で再スタート）</p>
+      <p><strong>完了</strong>：最終工程で「次の工程へ」が「完了」に変わります</p>
       <p><strong>終了</strong>：最後の工程として記録し振り返りへ</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">「完了」と「終了」は<strong>確認のダイアログ</strong>が出ます（誤って2回押しても計測が終わらないように）。確認している間の時間は記録に加算しません。</p>
       <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">PCキーボード：Enter = 次の工程 / Space = 一時停止 / BackSpace = 1つ戻す</p>
       <p style="color:var(--bad);font-size:0.85rem">工程タイマーが目標時間を超えると赤字表示</p>
       <p style="margin-top:6px"><strong>遅れ / 貯金</strong>：累計タイムの下に、目標に対して何分押しているかを表示します。工程ごとの赤字と違い、<strong>全体でどれだけ遅れているか</strong>が分かるので、どこで巻くかの判断に使えます。</p>
@@ -864,6 +875,11 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card" id="help-changelog">
     <h3 style="margin-bottom:12px">更新履歴</h3>
     <div style="font-size:0.9rem;line-height:1.7">
+      <p><strong>v1.5.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-08-31</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
+        <p>・ホーム画面の4つのタイル（エスキス / 記述 / 作図 / フル）を押しても新規セッションを始められるように。そのモードが選ばれた状態で開きます</p>
+        <p>・「完了」「終了」を押したときに確認が出るように（誤って2回押しても計測が終わりません）</p>
+      </div>
       <p><strong>v1.4.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-08-12</span></p>
       <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
         <p>・記録が10件たまるごとに、ホーム画面でバックアップをおすすめするように</p>
@@ -966,13 +982,13 @@ const STORAGE_KEYS = {
 const BACKUP_NOTICE_EVERY = 10;
 
 // バージョン。更新履歴(ヘルプ画面)と help.html の表記も合わせて更新すること
-const APP_VERSION = '1.4.0';
-const APP_VERSION_DATE = '2026-08-12';
+const APP_VERSION = '1.5.0';
+const APP_VERSION_DATE = '2026-08-31';
 
 // 更新後に1回だけ出す案内の本文。利用者から見て何が変わったかだけを書く
 const UPDATE_HIGHLIGHTS =
-  '・記録がたまってきたら、ホーム画面でバックアップをおすすめするようになりました\n' +
-  '・その場のボタンからファイルに書き出せます（記録はこの端末にしかないため）';
+  '・ホーム画面の4つのタイル（エスキス / 記述 / 作図 / フル）を押すと、そのモードで新規セッションを始められます\n' +
+  '・「完了」「終了」を押すと確認が出ます。誤って2回押しても計測が終わりません';
 
 // ========================================
 // 1.5 Dialog (alert / confirm の置き換え)
@@ -1356,6 +1372,14 @@ function showScreen(id) {
   if (id === 'setup') onSetupModeChange();
 }
 
+// ホームの4タイルから直接セッション設定へ。押したタイルのモードを選んだ状態で開く。
+// showScreen('setup') が onSetupModeChange() を呼ぶので、value を先に入れておけば
+// 工程セットの選択肢もそのモードのものに切り替わる
+function startSetupWithMode(mode) {
+  if (MODES.indexOf(mode) !== -1) document.getElementById('setup-mode').value = mode;
+  showScreen('setup');
+}
+
 // ========================================
 // 4. Timer State & Logic
 // ========================================
@@ -1612,8 +1636,38 @@ function undoLap() {
   saveActiveSession();
 }
 
-function lap() {
+// 計測を終わらせる操作の前に確認を挟む。
+// 確認している間もタイマーは動き続けるので、ボタンを押した時点の経過時間を控えておき、
+// OK なら戻してから確定する（迷っている数秒が記録に乗らないようにするため）
+async function askFinishConfirm(message, okLabel, title) {
+  const snap = { total: timerState.totalElapsed, step: timerState.stepElapsed };
+  if (!await askConfirm(message, okLabel, title)) return false;
+  timerState.totalElapsed = snap.total;
+  timerState.stepElapsed = snap.step;
+  return true;
+}
+
+// 「終了」ボタン。最終工程まで行かずに打ち切るので completed は false
+async function confirmFinish() {
   if (!timerState.running) return;
+  const ok = await askFinishConfirm(
+    'ここまでを最後の工程として記録し、計測を終了します。よろしいですか？\n\n' +
+    '（最終工程まで進んでいないため、ベストタイム・成長グラフの対象外になります）',
+    '終了する', '終了の確認');
+  if (ok) finishSession(false);
+}
+
+async function lap() {
+  if (!timerState.running) return;
+  // 最終工程の「完了」だけ確認を挟む。途中の工程は押す回数が多く、
+  // 押し間違いは「1つ戻す」で取り消せるので確認しない
+  if (timerState.currentStep >= timerState.steps.length - 1) {
+    const ok = await askFinishConfirm(
+      'これで最後の工程です。完了として記録し、振り返りへ進みますか？',
+      '完了する', '完了の確認');
+    if (!ok) return;
+    if (!timerState.running) return; // 確認中に別経路で終了していたら何もしない
+  }
   const step = timerState.steps[timerState.currentStep];
   timerState.laps.push({
     // 工程 id は履歴の突き合わせキー。ラップの時点で控えておく
@@ -1866,11 +1920,13 @@ function renderHome() {
     const bestTotal = getBestTotal(stats, tpl.id);
     const bt = bestTotal !== null ? formatTime(bestTotal) : '--:--:--';
     const last = own.length ? formatTime(own[own.length - 1].totalTime) : '--:--:--';
-    return '<div class="home-stat">' +
+    // タイル自体が「そのモードで新規セッション」への入口。押すとモードを選んだ状態で設定画面へ
+    return '<button type="button" class="home-stat" onclick="startSetupWithMode(\'' + m + '\')"' +
+      ' aria-label="' + MODE_LABELS[m] + 'モードで新規セッションを始める">' +
       '<div class="value">' + own.length + '</div>' +
       '<div class="label">' + MODE_LABELS[m] + '</div>' +
       '<div class="best-time">Best ' + bt + '<br>前回 ' + last + '</div>' +
-    '</div>';
+    '</button>';
   }).join('');
 
   // 工程セットが2つ以上あるモードだけ、いま使っているセット名を添える
@@ -2882,6 +2938,9 @@ function updateSetupPreview() {
 // ========================================
 document.addEventListener('keydown', function(e) {
   if (currentScreen !== 'timer') return;
+  // 確認ダイアログを開いている間はショートカットを効かせない
+  // （Enter 連打で確認が二重に開き、押した時点の経過時間の控えが失われる）
+  if (dialogResolve) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'Enter') {
     e.preventDefault();
