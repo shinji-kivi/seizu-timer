@@ -374,9 +374,15 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
    button の既定スタイル（枠線・フォント・文字色）を打ち消して従来の見た目に揃える */
 .home-stat {
   background:var(--bg-card); border-radius:var(--radius); padding:20px 12px;
-  flex:1; min-width:0; text-align:center;
+  flex:1; min-width:0; text-align:center; position:relative;
   border:none; color:inherit; font:inherit;
   cursor:pointer; transition:all 0.15s; -webkit-appearance:none; appearance:none;
+}
+/* 押せることの目印。タッチ端末には hover が無く、数字を並べただけに見えるため。
+   absolute にして高さと中身の配置に影響させない（読み上げは aria-label が担当） */
+.home-stat .go {
+  position:absolute; right:5px; top:50%; transform:translateY(-50%);
+  color:var(--text-dim); font-size:1.1rem; line-height:1; pointer-events:none;
 }
 /* 枠線は border ではなく inset の影で描く。
    border だとタイル4枚で計16px 高くなり、短い画面（320x568 等）でホームがはみ出すため */
@@ -391,8 +397,9 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 /* スマホ縦：各statを横長1行ずつ */
 @media (max-width:480px) {
   .home-stats { flex-direction:column; gap:8px; }
+  /* 右端に目印を置くぶん、右の余白を広げて Best/前回 と重ならないようにする */
   .home-stat {
-    display:flex; align-items:center; padding:12px 16px; text-align:left; gap:12px;
+    display:flex; align-items:center; padding:12px 26px 12px 16px; text-align:left; gap:12px;
   }
   .home-stat .label { font-size:0.9rem; margin:0; order:0; width:5em; }
   .home-stat .value { font-size:2rem; margin:0; order:1; flex:1; text-align:center; }
@@ -404,6 +411,11 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   .home-stat .value { font-size:2rem; }
   .home-stat .label { font-size:0.75rem; margin-top:2px; }
   .home-stat .best-time { font-size:0.75rem; margin-top:4px; }
+}
+/* 短い画面のスマホ（320x568 等）は上の2ブロックが両方効き、後勝ちで padding が 8px に戻る。
+   横並びレイアウトのままなので、右端の目印のぶんだけ余白を戻す */
+@media (max-width:480px) and (max-height:700px) {
+  .home-stat { padding-right:24px; }
 }
 
 /* Best time animation */
@@ -771,7 +783,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card">
     <h3 style="margin-bottom:12px">セッションを始める</h3>
     <div style="font-size:0.9rem;line-height:1.8">
-      <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:6px">ホーム画面の「新規セッション」のほか、上に並んだ<strong>4つのタイル（エスキス / 記述 / 作図 / フル）を押しても始められます</strong>。タイルから入るとそのモードが選ばれた状態になります。</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:6px">ホーム画面の「新規セッション」のほか、上に並んだ<strong>4つのタイル（エスキス / 記述 / 作図 / フル）を押しても始められます</strong>（右端の <strong>›</strong> が目印）。タイルから入るとそのモードが選ばれた状態になります。</p>
       <p><strong>① 課題名</strong>を入力（例：課題No.3 福祉施設）</p>
       <p><strong>② モード</strong>を選択</p>
       <div style="margin-left:12px;color:var(--text-dim);font-size:0.85rem">
@@ -1926,6 +1938,7 @@ function renderHome() {
       '<div class="value">' + own.length + '</div>' +
       '<div class="label">' + MODE_LABELS[m] + '</div>' +
       '<div class="best-time">Best ' + bt + '<br>前回 ' + last + '</div>' +
+      '<span class="go" aria-hidden="true">›</span>' +
     '</button>';
   }).join('');
 
