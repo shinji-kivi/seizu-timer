@@ -380,9 +380,11 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   cursor:pointer; transition:all 0.15s; -webkit-appearance:none; appearance:none;
 }
 /* 押せることの目印。タッチ端末には hover が無く、数字を並べただけに見えるため。
-   absolute にして高さと中身の配置に影響させない（読み上げは aria-label が担当） */
+   absolute にして高さと中身の配置に影響させない（読み上げは aria-label が担当）。
+   下向きにするため「›」を 90 度回す。文字を「⌄」に替えないのは、
+   フォントによって字の大きさ・太さがばらつくのを避けるため */
 .home-stat .go {
-  position:absolute; right:5px; top:50%; transform:translateY(-50%);
+  position:absolute; right:7px; top:50%; transform:translateY(-50%) rotate(90deg);
   color:var(--text-dim); font-size:1.1rem; line-height:1; pointer-events:none;
 }
 /* 枠線は border ではなく inset の影で描く。
@@ -784,7 +786,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card">
     <h3 style="margin-bottom:12px">セッションを始める</h3>
     <div style="font-size:0.9rem;line-height:1.8">
-      <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:6px">ホーム画面の「新規セッション」のほか、上に並んだ<strong>4つのタイル（エスキス / 記述 / 作図 / フル）を押しても始められます</strong>（右端の <strong>›</strong> が目印）。タイルから入るとそのモードが選ばれた状態になります。</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-bottom:6px">ホーム画面の「新規セッション」のほか、上に並んだ<strong>4つのタイル（エスキス / 記述 / 作図 / フル）を押しても始められます</strong>（右端に目印が付いています）。タイルから入るとそのモードが選ばれた状態になります。</p>
       <p><strong>① 課題名</strong>を入力（例：課題No.3 福祉施設）</p>
       <p><strong>② モード</strong>を選択</p>
       <div style="margin-left:12px;color:var(--text-dim);font-size:0.85rem">
