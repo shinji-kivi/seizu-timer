@@ -895,7 +895,8 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <p style="margin-top:6px"><strong>本番なら 15:42</strong>：開始時刻を設定していると、経過時間を本番の実時刻に換算して表示します。あわせて<strong>残り時間と終了予定時刻</strong>も出るので、「あと何分あるか」を頭の中で計算しなくて済みます。</p>
       <p style="color:var(--text-dim);font-size:0.85rem">計測中は画面が自動で消えないようにします（対応ブラウザのみ）。</p>
       <p style="margin-top:6px"><strong>目標到達の知らせ</strong>：セッション設定で「音」か「バイブ」を選ぶと、工程の目標時間に達したときに1回知らせます。<strong>既定は「知らせない」</strong>です。作図中で画面を見ていないときに使います。</p>
-      <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">端末が対応している手段だけが選択肢に出ます。<strong>iPhone / iPad はバイブに対応していない</strong>ため「音」だけになります。音は端末を消音にしていると鳴らないことがあります</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">端末が対応している手段だけが選択肢に出ます。<strong>iPhone / iPad はバイブに対応していない</strong>ため「音」だけになります</p>
+      <p style="color:var(--bad);font-size:0.85rem;margin-left:12px"><strong>端末を消音（サイレント）にしていると音は鳴りません。</strong>練習を始める前に消音を解除してください（iPad で確認済み）</p>
     </div>
   </div>
 
@@ -1566,7 +1567,7 @@ function renderNotifySelect() {
   document.getElementById('notify-test').style.display = mode === 'off' ? 'none' : '';
   const hint = document.getElementById('notify-hint');
   if (mode === 'sound') {
-    hint.textContent = '工程の目標時間に達したら短い音を鳴らします。端末を消音にしていると鳴らないことがあります。';
+    hint.textContent = '工程の目標時間に達したら短い音を鳴らします。端末を消音（サイレント）にしていると鳴りません。練習の前に消音を解除してください。';
   } else if (mode === 'vibrate') {
     hint.textContent = '工程の目標時間に達したら短く振動します。';
   } else {
