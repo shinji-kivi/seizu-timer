@@ -287,6 +287,16 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 }
 .rating-btn.selected-good { border-color:var(--good); background:rgba(52,211,153,0.15); color:var(--good); }
 .rating-btn.selected-bad { border-color:var(--bad); background:rgba(248,113,113,0.15); color:var(--bad); }
+/* 星評価（セッション全体）。★と☆は書体によって大きさ・太さが変わるので、
+   同じ字（★）のまま色だけで on/off を出し分ける */
+.star-input { display:flex; gap:2px; align-items:center; }
+.star-btn {
+  background:transparent; border:none; cursor:pointer; padding:2px 4px;
+  font-size:1.7rem; line-height:1; color:var(--border); transition:color 0.15s;
+}
+.star-btn.on { color:var(--warn); }
+.star-hint { color:var(--text-dim); font-size:0.8rem; margin-top:4px; }
+.stars-badge { display:inline-block; color:var(--warn); font-size:0.8rem; letter-spacing:1px; white-space:nowrap; margin-left:4px; }
 .review-memo { margin-top:6px; }
 .review-memo input {
   padding:8px 10px; font-size:0.85rem; background:var(--bg-input);
@@ -327,6 +337,8 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 }
 /* max-width: 工程セット名は長くなりがちなので、選択肢の幅で行が押し出されないよう頭を押さえる */
 .filter-bar select { width:auto; min-width:120px; max-width:190px; padding:8px 12px; font-size:0.85rem; }
+/* 星のフィルタは選択肢が短いので min-width を外す。狭い画面で1行増えるのを避けるため */
+#analysis-stars-filter { min-width:0; }
 .chart-container { position:relative; margin-bottom:24px; background:var(--bg-card); border-radius:var(--radius); padding:16px; }
 .chart-container canvas { min-height:300px; max-height:450px; }
 .stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
@@ -603,6 +615,11 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div id="review-summary" class="card" style="text-align:center;margin-bottom:16px"></div>
   <div id="review-steps"></div>
   <div class="form-group" style="margin-top:16px">
+    <label>この回の出来（任意）</label>
+    <div id="review-stars" class="star-input"></div>
+    <p class="star-hint">同じ星をもう一度押すと取り消せます</p>
+  </div>
+  <div class="form-group">
     <label>セッション全体メモ</label>
     <!-- autocomplete=off: リロード時のブラウザ標準フォーム復元が、復元した値を上書きするのを防ぐ -->
     <textarea id="review-memo" placeholder="全体の振り返りメモ..." autocomplete="off" oninput="setSessionMemo(this.value)"></textarea>
@@ -659,6 +676,13 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     </select>
     <select id="analysis-task-filter" onchange="renderAnalysis()">
       <option value="">全課題</option>
+    </select>
+    <select id="analysis-stars-filter" onchange="renderAnalysis()">
+      <option value="">全評価</option>
+      <option value="5">&#9733;5のみ</option>
+      <option value="4">&#9733;4以上</option>
+      <option value="3">&#9733;3以上</option>
+      <option value="0">未評価</option>
     </select>
   </div>
   <div class="tab-bar">
@@ -829,6 +853,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <div style="font-size:0.9rem;line-height:1.8">
       <p>各工程の実績・目標・過去平均を比較できます。</p>
       <p><strong>Good / Bad</strong>で各工程を評価（目標との比較で自動設定）</p>
+      <p><strong>この回の出来</strong>：セッション全体を星1〜5で評価できます（任意）。工程ごとのGood / Badとは別に、「会心の出来だった回」を後から探すための印です</p>
       <p>メモを入力して<strong>保存する</strong>を押すと履歴に記録されます。</p>
       <p><strong>保存せず終了</strong>：記録せずホームへ戻ります。</p>
     </div>
@@ -841,7 +866,7 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <p><strong>工程内訳</strong>：全工程の積み上げ棒グラフ、または工程を選んで折れ線表示</p>
       <p><strong>工程比較</strong>：各工程の平均・最速・最遅タイム</p>
       <p><strong>評価分析</strong>：工程ごとのGood率（Bad多い工程を強調表示）</p>
-      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">モード・工程セット・課題名でフィルタ可能</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-top:4px">モード・工程セット・課題名・星評価でフィルタ可能</p>
       <p style="color:var(--text-dim);font-size:0.85rem">工程名を変えても、同じ工程として過去の記録と繋がったまま集計します</p>
     </div>
   </div>
@@ -888,6 +913,12 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card" id="help-changelog">
     <h3 style="margin-bottom:12px">更新履歴</h3>
     <div style="font-size:0.9rem;line-height:1.7">
+      <p><strong>v1.6.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-09-06</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
+        <p>・振り返りで<strong>セッション全体を星1〜5で評価</strong>できるように。履歴一覧に星が並び、「会心の出来だった回」を後から探せます</p>
+        <p>・星は<strong>履歴の詳細から後付け・変更</strong>もできます（これまでの記録にも印を付けられます）</p>
+        <p>・分析画面に<strong>星評価のフィルタ</strong>を追加（★4以上だけで推移を見る、など）</p>
+      </div>
       <p><strong>v1.5.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-08-31</span></p>
       <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
         <p>・ホーム画面の4つのタイル（エスキス / 記述 / 作図 / フル）を押しても新規セッションを始められるように。そのモードが選ばれた状態で開きます</p>
@@ -995,8 +1026,8 @@ const STORAGE_KEYS = {
 const BACKUP_NOTICE_EVERY = 10;
 
 // バージョン。更新履歴(ヘルプ画面)と help.html の表記も合わせて更新すること
-const APP_VERSION = '1.5.0';
-const APP_VERSION_DATE = '2026-08-31';
+const APP_VERSION = '1.6.0';
+const APP_VERSION_DATE = '2026-09-06';
 
 // 更新後に1回だけ出す案内の本文。利用者から見て何が変わったかだけを書く
 const UPDATE_HIGHLIGHTS =
@@ -1410,7 +1441,8 @@ let timerState = {
   stepElapsed: 0,
   intervalId: null,
   laps: [],
-  clockStart: null   // 本番の開始時刻（0時からの分数）。null なら実時刻換算を出さない
+  clockStart: null,  // 本番の開始時刻（0時からの分数）。null なら実時刻換算を出さない
+  stars: 0           // セッション全体の星評価（1〜5）。0 は未評価
 };
 
 
@@ -1426,6 +1458,7 @@ function saveActiveSession(phase) {
     totalElapsed: timerState.totalElapsed, stepElapsed: timerState.stepElapsed,
     laps: timerState.laps, paused: timerState.paused,
     clockStart: timerState.clockStart,
+    stars: sessionStars(timerState),
     completed: !!timerState.completed,
     savedAt: Date.now()
   };
@@ -1454,6 +1487,7 @@ function tryResumeSession() {
         totalElapsed: data.totalElapsed, stepElapsed: 0,
         intervalId: null, laps: data.laps || [],
         clockStart: typeof data.clockStart === 'number' ? data.clockStart : null,
+        stars: sessionStars(data),
         completed: !!data.completed
       };
       showScreen('review');
@@ -1473,7 +1507,8 @@ function tryResumeSession() {
       totalElapsed: data.totalElapsed + elapsed,
       stepElapsed: data.stepElapsed + elapsed,
       intervalId: null, laps: data.laps,
-      clockStart: typeof data.clockStart === 'number' ? data.clockStart : null
+      clockStart: typeof data.clockStart === 'number' ? data.clockStart : null,
+      stars: sessionStars(data)
     };
     showScreen('timer');
     renderTimerUI();
@@ -1531,6 +1566,7 @@ function startSession() {
     steps: JSON.parse(JSON.stringify(tpl.steps)),
     currentStep: 0, totalElapsed: 0, stepElapsed: 0,
     intervalId: null, laps: [], completed: false,
+    stars: 0,
     clockStart: parseClockInput(clockRaw)
   };
   showScreen('timer');
@@ -1802,6 +1838,7 @@ function renderReview() {
       '<div class="review-memo"><input type="text" data-memo-idx="'+i+'" value="' + escapeAttr(lap.memo || '') + '" placeholder="メモ..." autocomplete="off" oninput="setLapMemo('+i+',this.value)"></div>';
     container.appendChild(div);
   });
+  renderReviewStars();
   syncReviewInputs();
   // 自動設定した評価も含めて復元用データに反映しておく
   saveActiveSession('review');
@@ -1820,6 +1857,18 @@ function syncReviewInputs() {
 
 function setSessionMemo(val) {
   timerState.memo = val;
+  saveActiveSession('review');
+}
+
+function renderReviewStars() {
+  document.getElementById('review-stars').innerHTML =
+    starInputHtml(sessionStars(timerState), 'setSessionStars');
+}
+
+function setSessionStars(n) {
+  // 同じ星をもう一度押したら取り消す（工程ごとの Good/Bad と同じ操作感にする）
+  timerState.stars = (sessionStars(timerState) === n) ? 0 : n;
+  renderReviewStars();
   saveActiveSession('review');
 }
 
@@ -1852,6 +1901,7 @@ function saveSession() {
     templateName: timerState.templateName || '',
     // DOM ではなく timerState を正とする（oninput で同期済み。リロード復元時の取りこぼし防止）
     memo: (timerState.memo || '').trim(),
+    stars: sessionStars(timerState),
     totalTime: timerState.totalElapsed,
     // 最終工程までラップしたか。途中で「終了」した回はベスト・成長グラフの対象外にする
     completed: timerState.completed === true,
@@ -1979,6 +2029,44 @@ function dismissBackupNotice() {
 // ========================================
 // 既定以外の工程セットで計測した回に、そのセット名を出す
 // （既定セットしか使っていない人の履歴が同じバッジで埋まらないように）
+// ----- 星評価（セッション全体）
+// 工程ごとの Good/Bad とは別軸で、「会心の出来だった回」を後から拾えるようにするための印。
+// 0 と未設定（星を入れる前に保存した記録）は「未評価」として同じに扱う
+function sessionStars(s) {
+  const n = (s && typeof s.stars === 'number') ? Math.round(s.stars) : 0;
+  return (n >= 1 && n <= 5) ? n : 0;
+}
+
+function starsText(n) {
+  return n > 0 ? '\u2605'.repeat(n) : '';
+}
+
+// 星の入力欄。handler には押した星の数を受け取る関数名を渡す。
+// arg を渡すと handler(arg, 星数) の形で呼ぶ（履歴詳細からセッション id を渡すため）
+function starInputHtml(current, handler, arg) {
+  const prefix = (arg === undefined || arg === null) ? '' : "'" + escapeAttr(String(arg)) + "',";
+  let html = '';
+  for (let i = 1; i <= 5; i++) {
+    html += '<button type="button" class="star-btn' + (i <= current ? ' on' : '') +
+      '" aria-label="\u661f' + i + '" onclick="' + handler + '(' + prefix + i + ')">&#9733;</button>';
+  }
+  return html;
+}
+
+// 履歴カードの星。未評価の回には何も出さない（印が付いた回だけ目立たせる）
+function starsBadge(s) {
+  const n = sessionStars(s);
+  return n ? '<span class="stars-badge">' + starsText(n) + '</span>' : '';
+}
+
+// 分析の星フィルタ。'' = 全部 / '0' = 未評価 / '3'〜'5' = その数以上
+function matchStarFilter(s, filter) {
+  if (!filter) return true;
+  const n = sessionStars(s);
+  if (filter === '0') return n === 0;
+  return n >= Number(filter);
+}
+
 function templateBadge(s, store) {
   if (sessionTemplateId(s) === defaultTemplateId(s.mode)) return '';
   return '<span class="mode-badge" style="background:rgba(255,255,255,0.08);margin-left:4px">' +
@@ -2034,7 +2122,7 @@ function renderHistory() {
       '<div class="history-card-header">' +
         '<div><div class="task-name">' + escapeText(s.taskName) + '</div>' +
         '<div class="date">' + formatDate(s.date) + '</div>' +
-        '<span class="mode-badge">' + MODE_LABELS[s.mode] + '</span>' + templateBadge(s, store) + incompleteBadge(s) + '</div>' +
+        '<span class="mode-badge">' + MODE_LABELS[s.mode] + '</span>' + templateBadge(s, store) + incompleteBadge(s) + starsBadge(s) + '</div>' +
         '<div class="total-time">' + formatTime(s.totalTime) + '</div>' +
       '</div>';
     el.appendChild(card);
@@ -2072,6 +2160,13 @@ function showSessionDetail(id) {
   });
   html += '</div>';
 
+  // 星は後からでも付け替えられるようにする。
+  // 星を入れる前に保存した記録（v1.5.0 以前）にも、後から「会心の回」の印を付けられる
+  html += '<div class="form-group"><label>この回の出来</label>' +
+    '<div class="star-input" id="detail-stars">' +
+      starInputHtml(sessionStars(s), 'updateSessionStars', s.id) + '</div>' +
+    '<p class="star-hint">同じ星をもう一度押すと取り消せます</p></div>';
+
   // 工程セットの付け替え。工程セット導入前の記録は全部「既定セット」に入るので、
   // 後から「これはタイムトライアルの回だった」と振り分けられるようにしておく
   const choices = templatesOfMode(store, s.mode);
@@ -2087,6 +2182,21 @@ function showSessionDetail(id) {
   html += '<button class="btn btn-danger btn-sm" onclick="deleteSession(\'' + s.id + '\')">このセッションを削除</button>';
   el.innerHTML = html;
   showScreen('detail');
+}
+
+// 保存済みセッションの星を付け替える。ベスト・集計には影響しないので recalcStats() は不要
+async function updateSessionStars(id, n) {
+  const sessions = getSessions();
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+  s.stars = (sessionStars(s) === n) ? 0 : n;
+  if (!saveSessions(sessions)) {
+    await notify('この端末のブラウザに保存できませんでした。変更は反映されていません。', '保存に失敗しました');
+    return;
+  }
+  // 画面ごと作り直すと開いている位置が飛ぶので、星の並びだけ差し替える
+  document.getElementById('detail-stars').innerHTML =
+    starInputHtml(sessionStars(s), 'updateSessionStars', s.id);
 }
 
 async function reassignSessionTemplate(id, templateId) {
@@ -2136,6 +2246,9 @@ function renderAnalysis() {
   const tplFilter = renderTemplateFilter('analysis-template-filter', filtered, store);
   if (tplFilter) filtered = filtered.filter(s => sessionTemplateId(s) === tplFilter);
   if (taskFilter) filtered = filtered.filter(s => s.taskName === taskFilter);
+  // 星評価での絞り込み（「会心の回だけ」で推移を見るため）
+  const starFilter = document.getElementById('analysis-stars-filter').value;
+  filtered = filtered.filter(s => matchStarFilter(s, starFilter));
 
   // 推移系グラフは完走した回のみ（途中終了が混ざると「急に速くなった」ように見えるため）
   const trend = filtered.filter(s => s.completed !== false);
@@ -2743,7 +2856,7 @@ function exportCSV() {
   if (sessions.length === 0) { notify('エクスポートするデータがありません'); return; }
   const BOM = '\uFEFF';
   const store = getTemplates();
-  const headers = ['実施日','課題名','モード','工程セット','工程番号','工程名','目標時間(分)','実績時間(分)','評価','メモ','合計時間(分)'];
+  const headers = ['実施日','課題名','モード','工程セット','工程番号','工程名','目標時間(分)','実績時間(分)','評価','メモ','合計時間(分)','星評価'];
   let csv = BOM + headers.join(',') + '\n';
   sessions.forEach(s => {
     s.steps.forEach((st, i) => {
@@ -2758,7 +2871,8 @@ function exportCSV() {
         Math.ceil(st.actualTime / 60),
         st.rating === 'good' ? 'Good' : (st.rating === 'bad' ? 'Bad' : ''),
         csvEscape(st.memo || ''),
-        Math.ceil(s.totalTime / 60)
+        Math.ceil(s.totalTime / 60),
+        sessionStars(s) || ''
       ];
       csv += row.join(',') + '\n';
     });
@@ -3017,6 +3131,8 @@ function generateDemoData() {
       id: 'demo_' + Date.now() + '_' + i, date: date.toISOString(),
       taskName: tasks[i % tasks.length], mode,
       templateId: tpl.id, templateName: tpl.name,
+      // 星は一部の回だけに付ける（未評価が混ざった見え方を確認できるように）
+      stars: (i % 3 === 0) ? 0 : (3 + (i % 3)),
       steps, totalTime, memo: '', completed: true
     });
   }

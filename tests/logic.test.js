@@ -78,7 +78,10 @@ const EXPORTED = [
   'saveSession', 'lap', 'finishSession',
   'BACKUP_NOTICE_EVERY', 'getBackupBaseline', 'setBackupBaseline', 'shouldNoticeBackup',
   'renderBackupNotice', 'dismissBackupNotice', 'renderHome',
-  'startSetupWithMode', 'confirmFinish', 'askFinishConfirm'
+  'startSetupWithMode', 'confirmFinish', 'askFinishConfirm',
+  'sessionStars', 'starsText', 'starInputHtml', 'starsBadge', 'matchStarFilter',
+  'setSessionStars', 'updateSessionStars', 'showSessionDetail', 'saveActiveSession',
+  'renderHistory'
 ];
 
 function extractScript() {
@@ -683,6 +686,135 @@ testAsync('「終了」もキャンセルできる。承認すると途中終了
   const st = app.getTimerState();
   ok(!st.running, '終了していない');
   eq(st.completed, false, '「終了」経由なのに完走扱いになっている');
+});
+
+// ================================================================ 10. セッション全体の星評価（v1.6.0）
+
+test('星の値は 1〜5 に正規化し、それ以外は未評価（0）として扱う', () => {
+  const app = loadApp();
+  // 星を入れる前に保存した記録（stars 自体が無い）
+  eq(app.sessionStars(legacySession()), 0);
+  eq(app.sessionStars({ stars: 0 }), 0);
+  eq(app.sessionStars({ stars: 3 }), 3);
+  eq(app.sessionStars({ stars: 5 }), 5);
+  // 範囲外・型違いは未評価に倒す（壊れたデータで表示が崩れないように）
+  eq(app.sessionStars({ stars: 6 }), 0);
+  eq(app.sessionStars({ stars: -1 }), 0);
+  eq(app.sessionStars({ stars: '4' }), 0);
+  eq(app.sessionStars(null), 0);
+  eq(app.starsText(3), '\u2605\u2605\u2605');
+  eq(app.starsText(0), '');
+});
+
+test('星の入力欄は5個のボタンを出し、現在値の数だけ on が付く', () => {
+  const app = loadApp();
+  const html = app.starInputHtml(3, 'setSessionStars');
+  eq((html.match(/<button/g) || []).length, 5);
+  eq((html.match(/star-btn on/g) || []).length, 3);
+  // 履歴詳細からはセッション id を第1引数に渡す
+  const withId = app.starInputHtml(0, 'updateSessionStars', 'abc1');
+  ok(withId.indexOf("updateSessionStars('abc1',1)") !== -1, 'id が呼び出しに載っていない');
+  eq((withId.match(/star-btn on/g) || []).length, 0);
+});
+
+test('振り返りで付けた星が保存され、中断データにも載る', () => {
+  const app = loadApp();
+  app.setTimerState({
+    running: false, paused: false, mode: 'drawing',
+    templateId: 'tpl_drawing_default', templateName: '本番想定（180分）',
+    taskName: '課題F', memo: '', totalElapsed: 4000, completed: true, stars: 0,
+    steps: [], currentStep: 0, stepElapsed: 0, laps: [
+      { id: 's_area', name: '面積表', targetTime: 240, actualTime: 250, rating: 'good', memo: '' }
+    ], clockStart: null
+  });
+  app.setSessionStars(4);
+  eq(app.getTimerState().stars, 4);
+  // 中断して開き直しても星が残るよう、復元用データにも入れる
+  const active = JSON.parse(app._storage.getItem('seizu_active_session'));
+  eq(active.stars, 4);
+  app.saveSession();
+  eq(app.getSessions()[0].stars, 4);
+});
+
+test('同じ星をもう一度押すと取り消される', () => {
+  const app = loadApp();
+  app.setTimerState({
+    running: false, paused: false, mode: 'drawing',
+    templateId: 'tpl_drawing_default', templateName: '', taskName: '課題G', memo: '',
+    totalElapsed: 100, completed: true, stars: 0, steps: [], currentStep: 0,
+    stepElapsed: 0, laps: [], clockStart: null
+  });
+  app.setSessionStars(5);
+  eq(app.getTimerState().stars, 5);
+  app.setSessionStars(5);
+  eq(app.getTimerState().stars, 0, '同じ星で取り消しにならない');
+  app.setSessionStars(2);
+  eq(app.getTimerState().stars, 2);
+});
+
+test('星を付けずに保存した回は 0 で記録される（旧記録と同じ扱い）', () => {
+  const app = loadApp();
+  app.setTimerState({
+    running: false, paused: false, mode: 'writing',
+    templateId: 'tpl_writing_default', templateName: '', taskName: '課題H', memo: '',
+    totalElapsed: 3000, completed: true, steps: [], currentStep: 0, stepElapsed: 0,
+    laps: [{ id: 's_writing', name: '記述', targetTime: 3600, actualTime: 3000, rating: 'good', memo: '' }],
+    clockStart: null
+  });
+  app.saveSession();
+  eq(app.getSessions()[0].stars, 0);
+});
+
+test('履歴カードには星が並び、未評価の回には出ない', () => {
+  // 履歴は保存された順の逆（新しい順）に並ぶので、後ろに置いた回が先頭に来る
+  const app = loadApp(seedWith([
+    legacySession({ id: 'b' }),
+    newSession({ id: 'a', stars: 4 })
+  ]));
+  eq(app.starsBadge({ stars: 4 }).indexOf('\u2605\u2605\u2605\u2605') !== -1, true);
+  eq(app.starsBadge(legacySession()), '');
+  app.renderHistory();
+  const cards = app._els['history-list'].children;
+  eq(cards.length, 2);
+  // 新しい順に並ぶので先頭が星付きの回
+  ok(cards[0].innerHTML.indexOf('stars-badge') !== -1, '星付きの回にバッジが出ていない');
+  ok(cards[1].innerHTML.indexOf('stars-badge') === -1, '未評価の回にバッジが出ている');
+});
+
+testAsync('履歴の詳細から星を後付けでき、もう一度押すと取り消せる', async () => {
+  const app = loadApp(seedWith([legacySession({ id: 'old1' })]));
+  app.showSessionDetail('old1');
+  ok(app._els['detail-content'].innerHTML.indexOf('detail-stars') !== -1, '星の入力欄が出ていない');
+  await app.updateSessionStars('old1', 5);
+  eq(app.getSessions()[0].stars, 5);
+  // タイムや工程は触らない
+  eq(app.getSessions()[0].totalTime, 6000);
+  eq(app.getSessions()[0].steps.length, 2);
+  await app.updateSessionStars('old1', 5);
+  eq(app.getSessions()[0].stars, 0, '同じ星で取り消しにならない');
+  // 存在しない id では何も壊さない
+  await app.updateSessionStars('no-such-id', 3);
+  eq(app.getSessions().length, 1);
+});
+
+test('分析の星フィルタは「以上」で絞り、未評価だけの抽出もできる', () => {
+  const app = loadApp();
+  const s0 = legacySession();          // 未評価
+  const s3 = newSession({ stars: 3 });
+  const s5 = newSession({ stars: 5 });
+  // 空文字は絞り込みなし
+  ok(app.matchStarFilter(s0, ''));
+  ok(app.matchStarFilter(s5, ''));
+  // '4' は 4以上
+  ok(!app.matchStarFilter(s3, '4'));
+  ok(app.matchStarFilter(s5, '4'));
+  ok(app.matchStarFilter(s3, '3'));
+  // '5' は 5のみ
+  ok(!app.matchStarFilter(s3, '5'));
+  ok(app.matchStarFilter(s5, '5'));
+  // '0' は未評価のみ
+  ok(app.matchStarFilter(s0, '0'));
+  ok(!app.matchStarFilter(s3, '0'));
 });
 
 // ---------------------------------------------------------------- 実行結果

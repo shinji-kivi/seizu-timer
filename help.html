@@ -464,6 +464,11 @@ footer a { color: var(--accent); text-decoration: none; }
       <p style="margin-top:6px">工程ごとにメモを残すことも可能です。</p>
     </div>
     <div class="card">
+      <h3>この回の出来（星評価）</h3>
+      <p>セッション全体を<strong>星1〜5</strong>で評価できます（任意・入れなくても構いません）。工程ごとの Good / Bad が「時間どおりだったか」を見るのに対して、星は<strong>「今日の出来がどうだったか」</strong>という別の軸の印です。</p>
+      <p style="margin-top:6px">付けた星は履歴一覧に並ぶので、<strong>会心の出来だった回</strong>を後から探せます。同じ星をもう一度押すと取り消せます。</p>
+    </div>
+    <div class="card">
       <h3>保存・破棄</h3>
       <ul>
         <li><span class="tag tag-accent">保存する</span> 評価・メモを含めて履歴に記録</li>
@@ -481,6 +486,7 @@ footer a { color: var(--accent); text-decoration: none; }
     <div class="card">
       <p>保存したセッションを新しい順に一覧表示します。モードでフィルタできます。</p>
       <p style="margin-top:6px">カードをタップすると工程ごとの詳細（タイム・評価・メモ）が確認でき、セッションの削除も行えます。</p>
+      <p style="margin-top:6px">星評価を付けた回にはカードに星が並びます。<strong>詳細画面から後で付け直す</strong>こともできるので、星を入れる前に保存した記録にも印を付けられます。</p>
     </div>
   </section>
 
@@ -505,7 +511,7 @@ footer a { color: var(--accent); text-decoration: none; }
     <div class="card">
       <h3>評価分析</h3>
       <p>工程ごとのGood率を表示します。Badが多い工程は赤線でハイライトされるため、重点的に練習すべき工程がひと目でわかります。</p>
-      <div class="tip">モード・課題名でフィルタして特定条件での分析も可能です。</div>
+      <div class="tip">モード・工程セット・課題名・星評価でフィルタして特定条件での分析も可能です。「★4以上だけで成長推移を見る」といった使い方ができます。</div>
     </div>
   </section>
 
@@ -587,6 +593,14 @@ footer a { color: var(--accent); text-decoration: none; }
       <h2>更新履歴</h2>
     </div>
     <div class="card">
+      <h3>v1.6.0 &mdash; 2026-09-06</h3>
+      <ul>
+        <li>振り返りで<strong>セッション全体を星1〜5で評価</strong>できるようにしました。履歴一覧に星が並ぶので、会心の出来だった回を後から探せます</li>
+        <li>星は<strong>履歴の詳細から後付け・変更</strong>もできます（これまでの記録にも印を付けられます）</li>
+        <li>分析画面に<strong>星評価のフィルタ</strong>を追加しました（★4以上だけで推移を見る、など）</li>
+      </ul>
+    </div>
+    <div class="card">
       <h3>v1.5.0 &mdash; 2026-08-31</h3>
       <ul>
         <li>ホーム画面の<strong>4つのタイル（エスキス / 記述 / 作図 / フル）を押しても新規セッションを始められる</strong>ようにしました。タイルから入るとそのモードが選ばれた状態で開きます</li>
@@ -643,7 +657,7 @@ footer a { color: var(--accent); text-decoration: none; }
 
   <footer>
     <p>製図時間管理ツール &mdash; 一級建築士製図試験用</p>
-    <p style="margin-top:4px">v1.5.0（2026-08-31）</p>
+    <p style="margin-top:4px">v1.6.0（2026-09-06）</p>
     <p style="margin-top:6px"><a href="index.html">アプリを開く</a> &nbsp;|&nbsp; <a href="https://github.com/shinji-kivi/seizu-timer" target="_blank" rel="noopener">GitHub</a></p>
   </footer>
 
