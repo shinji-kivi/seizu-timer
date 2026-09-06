@@ -81,7 +81,9 @@ const EXPORTED = [
   'startSetupWithMode', 'confirmFinish', 'askFinishConfirm',
   'sessionStars', 'starsText', 'starInputHtml', 'starsBadge', 'matchStarFilter',
   'setSessionStars', 'updateSessionStars', 'showSessionDetail', 'saveActiveSession',
-  'renderHistory'
+  'renderHistory',
+  'HEATMAP_DAYS', 'dateKey', 'buildDailyTotals', 'heatLevel', 'buildHeatmapCells',
+  'buildTotals', 'heatCellText', 'renderHeatmap'
 ];
 
 function extractScript() {
@@ -815,6 +817,114 @@ test('分析の星フィルタは「以上」で絞り、未評価だけの抽�
   // '0' は未評価のみ
   ok(app.matchStarFilter(s0, '0'));
   ok(!app.matchStarFilter(s3, '0'));
+});
+
+// ================================================================ 11. ヒートマップと累計カウンター（v1.7.0）
+
+// 指定日からの相対日で ISO 文字列を作る（ローカル時刻の 10:00 に置く）
+function daysAgoISO(n, hour) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  d.setHours(hour === undefined ? 10 : hour, 0, 0, 0);
+  return d.toISOString();
+}
+
+function sessionOn(iso, seconds, over) {
+  return Object.assign(newSession({ id: 'h' + iso + Math.random(), date: iso, totalTime: seconds }), over || {});
+}
+
+test('マスの濃さは 1時間・2時間半・5時間を境に変わる', () => {
+  const app = loadApp();
+  eq(app.heatLevel(0), 0);
+  eq(app.heatLevel(59 * 60), 1);
+  eq(app.heatLevel(60 * 60), 2);
+  eq(app.heatLevel(149 * 60), 2);
+  eq(app.heatLevel(150 * 60), 3);
+  eq(app.heatLevel(299 * 60), 3);
+  eq(app.heatLevel(300 * 60), 4);
+  // 通し練習（6時間30分）は最も濃い
+  eq(app.heatLevel(390 * 60), 4);
+});
+
+test('同じ日に2回やった分は1つのマスに足し合わされる', () => {
+  const app = loadApp();
+  const iso = daysAgoISO(3, 9);
+  const iso2 = daysAgoISO(3, 15);
+  const daily = app.buildDailyTotals([sessionOn(iso, 3600), sessionOn(iso2, 1800)]);
+  const keys = Object.keys(daily);
+  eq(keys.length, 1, '同じ日が2つのマスに割れている');
+  eq(daily[keys[0]].count, 2);
+  eq(daily[keys[0]].seconds, 5400);
+});
+
+test('日付はローカル時刻で切る（深夜でも UTC に引きずられない）', () => {
+  const app = loadApp();
+  const d = new Date(2026, 8, 6, 1, 30);   // 2026-09-06 01:30 ローカル
+  eq(app.dateKey(d), '2026-09-06');
+});
+
+test('ヒートマップは日曜始まりで、最後のマスが今日になる', () => {
+  const app = loadApp();
+  const cells = app.buildHeatmapCells([], new Date());
+  eq(cells[0].dow, 0, '先頭が日曜になっていない');
+  // 今週は途中なので最後の列は欠ける（週の頭まで遡るぶん最大6日ふえる）
+  ok(cells.length >= app.HEATMAP_DAYS, 'マスが6ヶ月ぶんに足りない');
+  ok(cells.length <= app.HEATMAP_DAYS + 6, 'マスが多すぎる: ' + cells.length);
+  ok(cells[cells.length - 1].isToday, '最後のマスが今日ではない');
+  ok(cells.filter(c => c.isToday).length === 1, '今日のマスが1つではない');
+});
+
+test('6ヶ月より古い記録はマスに乗らないが、累計には入る', () => {
+  const app = loadApp();
+  const old = sessionOn(daysAgoISO(300), 3600);
+  const recent = sessionOn(daysAgoISO(5), 7200);
+  const cells = app.buildHeatmapCells([old, recent], new Date());
+  const lit = cells.filter(c => c.count > 0);
+  eq(lit.length, 1, '6ヶ月より古い記録がマスに出ている');
+  eq(lit[0].seconds, 7200);
+  const t = app.buildTotals([old, recent]);
+  eq(t.sessions, 2, '古い記録が総セッション数から抜けている');
+  eq(t.seconds, 10800);
+});
+
+test('累計は「練習した日数」をユニークな日で数え、途中終了も含める', () => {
+  const app = loadApp();
+  const t = app.buildTotals([
+    sessionOn(daysAgoISO(1, 9), 3600),
+    sessionOn(daysAgoISO(1, 14), 1800),
+    sessionOn(daysAgoISO(2), 900, { completed: false })
+  ]);
+  eq(t.sessions, 3);
+  eq(t.days, 2, '同じ日の2回が2日と数えられている');
+  eq(t.seconds, 6300, '途中終了した回の時間が抜けている');
+  // 記録が無ければすべて 0
+  const zero = app.buildTotals([]);
+  eq([zero.sessions, zero.days, zero.seconds], [0, 0, 0]);
+});
+
+test('マスの説明文は、練習した日と何もない日で書き分ける', () => {
+  const app = loadApp();
+  const cells = app.buildHeatmapCells([sessionOn(daysAgoISO(2), 5400)], new Date());
+  const lit = cells.filter(c => c.count > 0)[0];
+  const empty = cells.filter(c => c.count === 0)[0];
+  ok(app.heatCellText(lit).indexOf('1回・1時間30分') !== -1, '実際: ' + app.heatCellText(lit));
+  ok(app.heatCellText(empty).indexOf('練習なし') !== -1, '実際: ' + app.heatCellText(empty));
+});
+
+test('カウンターとヒートマップを描くと、マスと数字が入る', () => {
+  const app = loadApp(seedWith([
+    sessionOn(daysAgoISO(1), 23400),        // 6時間30分
+    sessionOn(daysAgoISO(1, 16), 3600),     // 同じ日にもう1回
+    sessionOn(daysAgoISO(10), 1800)
+  ]));
+  app.renderHeatmap();
+  eq(app._els['total-sessions'].textContent, '3回');
+  eq(app._els['total-days'].textContent, '2日');
+  eq(app._els['total-hours'].textContent, '8時間');   // 390 + 60 + 30 分
+  const cells = app._els['heatmap-grid'].children;
+  ok(cells.length >= app.HEATMAP_DAYS, 'マスが足りない');
+  eq(cells.filter(c => c.className.indexOf('lv') !== -1).length, 2, '色の付いたマスの数が合わない');
+  eq(cells.filter(c => c.className.indexOf('today') !== -1).length, 1);
 });
 
 // ---------------------------------------------------------------- 実行結果

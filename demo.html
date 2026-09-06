@@ -346,6 +346,36 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
 .stat-card .stat-value { font-size:1.5rem; font-weight:700; color:var(--accent); }
 .stat-card .stat-label { font-size:0.8rem; color:var(--text-dim); margin-top:4px; }
 
+/* 累計カウンター。狭い画面では「総練習時間」だけ1行使う（時間の表記が長いので潰れないように） */
+.total-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; margin-bottom:16px; }
+.total-grid .stat-card { padding:12px 8px; }
+.total-grid .stat-card .stat-value { font-size:1.25rem; }
+.total-grid .stat-card:last-child { grid-column:1 / -1; }
+@media (min-width:520px) {
+  .total-grid { grid-template-columns:repeat(3,1fr); }
+  .total-grid .stat-card:last-child { grid-column:auto; }
+}
+
+/* ヒートマップ。7行（日〜土）に固定して、週を列として左から右へ並べる */
+.heat-title { font-size:0.9rem; font-weight:600; margin-bottom:8px; }
+.heatmap { display:grid; grid-template-rows:repeat(7,1fr); grid-auto-flow:column; grid-auto-columns:1fr; gap:2px; }
+/* aspect-ratio 未対応の古いブラウザでも潰れないよう min-height を添える */
+.heat-cell { aspect-ratio:1; min-height:8px; border-radius:2px; background:var(--bg-input); border:none; padding:0; cursor:pointer; }
+.heat-cell.lv1 { background:var(--accent); opacity:0.3; }
+.heat-cell.lv2 { background:var(--accent); opacity:0.55; }
+.heat-cell.lv3 { background:var(--accent); opacity:0.8; }
+.heat-cell.lv4 { background:var(--accent); opacity:1; }
+.heat-cell.today { box-shadow:0 0 0 1.5px var(--text); }
+.heat-detail { font-size:0.85rem; color:var(--text-dim); margin-top:10px; min-height:1.4em; }
+.heat-legend { display:flex; align-items:center; gap:3px; justify-content:flex-end; margin-top:8px; font-size:0.75rem; color:var(--text-dim); }
+.heat-legend i { width:10px; height:10px; border-radius:2px; background:var(--bg-input); display:inline-block; }
+.heat-legend i.lv1 { background:var(--accent); opacity:0.3; }
+.heat-legend i.lv2 { background:var(--accent); opacity:0.55; }
+.heat-legend i.lv3 { background:var(--accent); opacity:0.8; }
+.heat-legend i.lv4 { background:var(--accent); opacity:1; }
+.heat-legend span:first-child { margin-right:2px; }
+.heat-legend span:last-child { margin-left:2px; }
+
 /* Settings - step editor */
 .step-editor-item {
   display:flex; gap:8px; align-items:center; padding:10px;
@@ -691,9 +721,22 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <button class="tab-btn" onclick="switchAnalysisTab('compare',this)">工程比較</button>
     <button class="tab-btn" onclick="switchAnalysisTab('rating',this)">評価分析</button>
   </div>
-  <div id="analysis-progress" class="chart-container">
-    <canvas id="chart-progress"></canvas>
-    <div id="progress-empty" class="empty-state" style="display:none">データなし</div>
+  <div id="analysis-progress">
+    <div class="total-grid">
+      <div class="stat-card"><div class="stat-value" id="total-sessions">0</div><div class="stat-label">総セッション数</div></div>
+      <div class="stat-card"><div class="stat-value" id="total-days">0</div><div class="stat-label">練習した日数</div></div>
+      <div class="stat-card"><div class="stat-value" id="total-hours">0分</div><div class="stat-label">総練習時間</div></div>
+    </div>
+    <div class="card" style="margin-bottom:24px">
+      <div class="heat-title">直近6ヶ月の練習</div>
+      <div id="heatmap-grid" class="heatmap"></div>
+      <div id="heat-detail" class="heat-detail">マスを押すと、その日の記録が出ます</div>
+      <div class="heat-legend"><span>少ない</span><i></i><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i><span>多い</span></div>
+    </div>
+    <div class="chart-container">
+      <canvas id="chart-progress"></canvas>
+      <div id="progress-empty" class="empty-state" style="display:none">データなし</div>
+    </div>
   </div>
   <div id="analysis-breakdown" style="display:none">
     <div style="margin-bottom:8px">
@@ -862,7 +905,8 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card">
     <h3 style="margin-bottom:12px">分析</h3>
     <div style="font-size:0.9rem;line-height:1.8">
-      <p><strong>成長推移</strong>：合計タイムの変化を折れ線で表示</p>
+      <p><strong>成長推移</strong>：累計カウンター（総セッション数 / 練習した日数 / 総練習時間）と直近6ヶ月のヒートマップ、合計タイムの折れ線</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">カウンターとヒートマップは<strong>常に全記録が対象</strong>です（フィルタで減りません）。ヒートマップのマスは色が濃いほどその日の練習時間が長く、押すとその日の記録が出ます</p>
       <p><strong>工程内訳</strong>：全工程の積み上げ棒グラフ、または工程を選んで折れ線表示</p>
       <p><strong>工程比較</strong>：各工程の平均・最速・最遅タイム</p>
       <p><strong>評価分析</strong>：工程ごとのGood率（Bad多い工程を強調表示）</p>
@@ -913,6 +957,12 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card" id="help-changelog">
     <h3 style="margin-bottom:12px">更新履歴</h3>
     <div style="font-size:0.9rem;line-height:1.7">
+      <p><strong>v1.7.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-09-06</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
+        <p>・分析の「成長推移」に<strong>累計カウンター</strong>（総セッション数 / 練習した日数 / 総練習時間）を追加</p>
+        <p>・<strong>直近6ヶ月のヒートマップ</strong>を追加。色が濃い日ほど練習時間が長く、マスを押すとその日の記録が出ます</p>
+        <p>・どちらも全記録が対象なので、1日休んでも数字は減りません</p>
+      </div>
       <p><strong>v1.6.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-09-06</span></p>
       <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
         <p>・振り返りで<strong>セッション全体を星1〜5で評価</strong>できるように。履歴一覧に星が並び、「会心の出来だった回」を後から探せます</p>
@@ -1026,7 +1076,7 @@ const STORAGE_KEYS = {
 const BACKUP_NOTICE_EVERY = 10;
 
 // バージョン。更新履歴(ヘルプ画面)と help.html の表記も合わせて更新すること
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 const APP_VERSION_DATE = '2026-09-06';
 
 // 更新後に1回だけ出す案内の本文。利用者から見て何が変わったかだけを書く
@@ -2250,6 +2300,9 @@ function renderAnalysis() {
   const starFilter = document.getElementById('analysis-stars-filter').value;
   filtered = filtered.filter(s => matchStarFilter(s, starFilter));
 
+  // 累計カウンターとヒートマップはフィルタに関係なく全記録が対象
+  renderHeatmap();
+
   // 推移系グラフは完走した回のみ（途中終了が混ざると「急に速くなった」ように見えるため）
   const trend = filtered.filter(s => s.completed !== false);
   renderProgressChart(trend);
@@ -2264,6 +2317,101 @@ function renderAnalysis() {
 function toggleChartEmpty(canvasId, emptyId, isEmpty) {
   document.getElementById(canvasId).style.display = isEmpty ? 'none' : '';
   document.getElementById(emptyId).style.display = isEmpty ? '' : 'none';
+}
+
+// ----- 累計カウンターとヒートマップ（v1.7.0）
+// 「何日連続で練習したか」ではなく「どれだけ積み上げたか」で見せる。
+// 連続日数は1日休んだだけで 0 に戻り、途切れた時点でモチベーションを削ぐため採らない。
+// カウンターとヒートマップは分析のフィルタに連動させず、常に全記録を集計する
+// （絞り込むたびに総量が減って見えると「積み上げ」の意味が無くなるため）。
+const HEATMAP_DAYS = 182;          // 直近6ヶ月ぶん
+const DOW_LABELS = ['日','月','火','水','木','金','土'];
+
+// ローカル時刻での YYYY-MM-DD。UTC で切ると日本時間の朝が前日に寄るので使わない
+function dateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+    '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// 日ごとの回数と練習時間。同じ日に2回やれば足し合わせる
+function buildDailyTotals(sessions) {
+  const map = {};
+  (sessions || []).forEach(s => {
+    const k = dateKey(new Date(s.date));
+    if (!map[k]) map[k] = { count: 0, seconds: 0 };
+    map[k].count++;
+    map[k].seconds += s.totalTime || 0;
+  });
+  return map;
+}
+
+// マスの濃さ。1時間・2時間半・5時間を境にする（部分練習と通し練習が見分けられる幅）
+function heatLevel(seconds) {
+  const min = (seconds || 0) / 60;
+  if (min <= 0) return 0;
+  if (min < 60) return 1;
+  if (min < 150) return 2;
+  if (min < 300) return 3;
+  return 4;
+}
+
+// 直近6ヶ月ぶんのマスを作る。日曜始まりの週で並ぶよう、開始日を週の頭まで戻す
+function buildHeatmapCells(sessions, today) {
+  const daily = buildDailyTotals(sessions);
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const cur = new Date(end);
+  cur.setDate(cur.getDate() - (HEATMAP_DAYS - 1));
+  cur.setDate(cur.getDate() - cur.getDay());
+  const endKey = dateKey(end);
+  const cells = [];
+  while (dateKey(cur) <= endKey) {
+    const k = dateKey(cur);
+    const hit = daily[k] || { count: 0, seconds: 0 };
+    cells.push({
+      key: k, month: cur.getMonth() + 1, day: cur.getDate(), dow: cur.getDay(),
+      count: hit.count, seconds: hit.seconds, level: heatLevel(hit.seconds),
+      isToday: k === endKey
+    });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return cells;
+}
+
+// 累計。途中終了した回も練習量としては数える（時間は実際に使っているため）
+function buildTotals(sessions) {
+  const list = sessions || [];
+  return {
+    sessions: list.length,
+    days: Object.keys(buildDailyTotals(list)).length,
+    seconds: list.reduce((a, s) => a + (s.totalTime || 0), 0)
+  };
+}
+
+function heatCellText(c) {
+  const head = c.month + '/' + c.day + '（' + DOW_LABELS[c.dow] + '）';
+  if (!c.count) return head + ' 練習なし';
+  return head + ' ' + c.count + '回・' + formatDuration(c.seconds);
+}
+
+function renderHeatmap() {
+  const sessions = getSessions();
+  const t = buildTotals(sessions);
+  document.getElementById('total-sessions').textContent = t.sessions + '回';
+  document.getElementById('total-days').textContent = t.days + '日';
+  document.getElementById('total-hours').textContent = formatDuration(t.seconds);
+
+  const grid = document.getElementById('heatmap-grid');
+  grid.innerHTML = '';
+  buildHeatmapCells(sessions, new Date()).forEach(c => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'heat-cell' + (c.level ? ' lv' + c.level : '') + (c.isToday ? ' today' : '');
+    // PC はホバーで、スマホはタップで中身が読めるようにする
+    el.title = heatCellText(c);
+    el.setAttribute('aria-label', heatCellText(c));
+    el.onclick = () => { document.getElementById('heat-detail').textContent = heatCellText(c); };
+    grid.appendChild(el);
+  });
 }
 
 function renderProgressChart(sessions) {

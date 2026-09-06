@@ -499,6 +499,8 @@ footer a { color: var(--accent); text-decoration: none; }
     <div class="card">
       <h3>成長推移</h3>
       <p>合計タイムの変化を折れ線グラフで表示します。練習を重ねるごとに短縮されていく様子を確認できます。</p>
+      <p style="margin-top:6px">あわせて<strong>累計カウンター</strong>（総セッション数 / 練習した日数 / 総練習時間）と、<strong>直近6ヶ月のヒートマップ</strong>を表示します。マスは色が濃いほどその日の練習時間が長く、押すとその日の記録が出ます。</p>
+      <div class="tip">連続日数ではなく<strong>積み上げた量</strong>で見せています。1日休んでも数字は減りません。カウンターとヒートマップはフィルタに連動せず、常に全記録が対象です。</div>
     </div>
     <div class="card">
       <h3>工程内訳</h3>
@@ -593,6 +595,14 @@ footer a { color: var(--accent); text-decoration: none; }
       <h2>更新履歴</h2>
     </div>
     <div class="card">
+      <h3>v1.7.0 &mdash; 2026-09-06</h3>
+      <ul>
+        <li>分析の「成長推移」に<strong>累計カウンター</strong>（総セッション数 / 練習した日数 / 総練習時間）を追加しました</li>
+        <li><strong>直近6ヶ月のヒートマップ</strong>を追加しました。色が濃い日ほど練習時間が長く、マスを押すとその日の記録が出ます</li>
+        <li>どちらも全記録が対象なので、1日休んでも数字は減りません</li>
+      </ul>
+    </div>
+    <div class="card">
       <h3>v1.6.0 &mdash; 2026-09-06</h3>
       <ul>
         <li>振り返りで<strong>セッション全体を星1〜5で評価</strong>できるようにしました。履歴一覧に星が並ぶので、会心の出来だった回を後から探せます</li>
@@ -657,7 +667,7 @@ footer a { color: var(--accent); text-decoration: none; }
 
   <footer>
     <p>製図時間管理ツール &mdash; 一級建築士製図試験用</p>
-    <p style="margin-top:4px">v1.6.0（2026-09-06）</p>
+    <p style="margin-top:4px">v1.7.0（2026-09-06）</p>
     <p style="margin-top:6px"><a href="index.html">アプリを開く</a> &nbsp;|&nbsp; <a href="https://github.com/shinji-kivi/seizu-timer" target="_blank" rel="noopener">GitHub</a></p>
   </footer>
 
