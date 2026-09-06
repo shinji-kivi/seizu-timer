@@ -439,6 +439,11 @@ footer a { color: var(--accent); text-decoration: none; }
       <div class="tip">PCキーボードショートカット：<span class="kbd">Enter</span> = 次の工程 ／ <span class="kbd">Space</span> = 一時停止 ／ <span class="kbd">BackSpace</span> = 1つ戻す</div>
     </div>
     <div class="card">
+      <h3>目標到達の知らせ</h3>
+      <p>セッション設定の「工程の目標到達を知らせる」で<strong>音</strong>か<strong>バイブ</strong>を選ぶと、工程の目標時間に達したときに1回だけ知らせます。作図中で画面を見ていないときに、手を止めずに気づけます。<strong>既定は「知らせない」</strong>です。</p>
+      <div class="tip">端末が対応している手段だけが選択肢に出ます。<strong>iPhone / iPad はバイブに対応していない</strong>ため「音」だけになります。音は端末を消音にしていると鳴らないことがあるので、設定で選んだ直後に一度鳴らして確かめてください（「試す」ボタンでも鳴らせます）。</div>
+    </div>
+    <div class="card">
       <h3>画面のスリープ</h3>
       <p>計測中は、画面が自動で消えないようにします（対応ブラウザのみ）。端末側の自動ロック設定を変える必要はありません。うまく効かない場合は、端末の設定で自動ロックを一時的にオフにしてください。</p>
     </div>
@@ -595,6 +600,13 @@ footer a { color: var(--accent); text-decoration: none; }
       <h2>更新履歴</h2>
     </div>
     <div class="card">
+      <h3>v1.8.0 &mdash; 2026-09-06</h3>
+      <ul>
+        <li>工程の<strong>目標時間に達したときに知らせる</strong>機能を追加しました（音 / バイブ）。<strong>既定は「知らせない」</strong>です</li>
+        <li>セッション設定から選べます。端末が対応している手段だけが選択肢に出ます（iPhone / iPad はバイブに対応していないため音のみ）</li>
+      </ul>
+    </div>
+    <div class="card">
       <h3>v1.7.0 &mdash; 2026-09-06</h3>
       <ul>
         <li>分析の「成長推移」に<strong>累計カウンター</strong>（総セッション数 / 練習した日数 / 総練習時間）を追加しました</li>
@@ -667,7 +679,7 @@ footer a { color: var(--accent); text-decoration: none; }
 
   <footer>
     <p>製図時間管理ツール &mdash; 一級建築士製図試験用</p>
-    <p style="margin-top:4px">v1.7.0（2026-09-06）</p>
+    <p style="margin-top:4px">v1.8.0（2026-09-06）</p>
     <p style="margin-top:6px"><a href="index.html">アプリを開く</a> &nbsp;|&nbsp; <a href="https://github.com/shinji-kivi/seizu-timer" target="_blank" rel="noopener">GitHub</a></p>
   </footer>
 

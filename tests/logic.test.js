@@ -83,7 +83,9 @@ const EXPORTED = [
   'setSessionStars', 'updateSessionStars', 'showSessionDetail', 'saveActiveSession',
   'renderHistory',
   'HEATMAP_DAYS', 'dateKey', 'buildDailyTotals', 'heatLevel', 'buildHeatmapCells',
-  'buildTotals', 'heatCellText', 'renderHeatmap'
+  'buildTotals', 'heatCellText', 'renderHeatmap',
+  'NOTIFY_MODES', 'notifySupport', 'getNotifyMode', 'setNotifyMode', 'shouldNotifyStep',
+  'renderNotifySelect', 'onNotifyModeChange', 'fireNotify', 'playBeep'
 ];
 
 function extractScript() {
@@ -925,6 +927,128 @@ test('カウンターとヒートマップを描くと、マスと数字が入�
   ok(cells.length >= app.HEATMAP_DAYS, 'マスが足りない');
   eq(cells.filter(c => c.className.indexOf('lv') !== -1).length, 2, '色の付いたマスの数が合わない');
   eq(cells.filter(c => c.className.indexOf('today') !== -1).length, 1);
+});
+
+// ================================================================ 12. 目標到達の知らせ（v1.8.0）
+
+// _els は getElementById を通ったときに生えるので、テストから先に触る要素はこれで取る
+function el(app, id) { return app._ctx.document.getElementById(id); }
+
+// 端末の対応状況を作る。vm の context に生やすと、中のコードからも見える
+function withSupport(app, opts) {
+  const ctx = app._ctx;
+  if (opts.vibrate) { ctx.navigator.vibrate = () => true; }
+  else { delete ctx.navigator.vibrate; }
+  if (opts.sound) { ctx.AudioContext = function () { this.state = 'running'; }; }
+  else { delete ctx.AudioContext; }
+  return app;
+}
+
+test('既定は「知らせない」。壊れた値・使えない手段が入っていてもオフに倒す', () => {
+  const app = withSupport(loadApp(), { sound: true, vibrate: true });
+  eq(app.getNotifyMode(), 'off', '既定がオフではない');
+  app._storage.setItem('seizu_notify', 'sound');
+  eq(app.getNotifyMode(), 'sound');
+  app._storage.setItem('seizu_notify', 'ぶるぶる');
+  eq(app.getNotifyMode(), 'off', '知らない値がオフに倒れていない');
+  // バイブ非対応の端末に「バイブ」が保存されたまま移ってきた場合
+  app._storage.setItem('seizu_notify', 'vibrate');
+  withSupport(app, { sound: true, vibrate: false });
+  eq(app.getNotifyMode(), 'off', '使えない手段がそのまま返っている');
+});
+
+test('知らない値は保存しない', () => {
+  const app = withSupport(loadApp(), { sound: true, vibrate: true });
+  ok(!app.setNotifyMode('flash'));
+  eq(app._storage.getItem('seizu_notify'), null);
+  ok(app.setNotifyMode('vibrate'));
+  eq(app._storage.getItem('seizu_notify'), 'vibrate');
+});
+
+test('目標に達した瞬間だけ知らせ、同じ工程では鳴らし直さない', () => {
+  const app = loadApp();
+  const f = app.shouldNotifyStep;
+  ok(!f(299, 300, -1, 0), '目標前に鳴っている');
+  ok(f(300, 300, -1, 0), '目標到達で鳴っていない');
+  ok(f(450, 300, -1, 0), '超過後に復帰しても鳴らない');
+  ok(!f(450, 300, 0, 0), '同じ工程で2回目が鳴る');
+  // 次の工程に進めばまた鳴る
+  ok(f(300, 300, 0, 1), '次の工程で鳴らない');
+  // 目標時間が無い工程では鳴らさない
+  ok(!f(999, 0, -1, 0));
+  ok(!f(999, undefined, -1, 0));
+});
+
+test('選択肢は端末が対応している手段だけ出す', () => {
+  // 音もバイブも使える端末（Android の Chrome など）
+  const both = withSupport(loadApp(), { sound: true, vibrate: true });
+  both.renderNotifySelect();
+  eq(both._els['setup-notify'].children.map(o => o.value), ['off', 'sound', 'vibrate']);
+  eq(both._els['notify-group'].style.display, '');
+
+  // iPad（音は出せるがバイブは非対応）
+  const ipad = withSupport(loadApp(), { sound: true, vibrate: false });
+  ipad.renderNotifySelect();
+  eq(ipad._els['setup-notify'].children.map(o => o.value), ['off', 'sound'],
+    'iPad にバイブの選択肢が出ている');
+
+  // どちらも使えない端末では設定ごと隠す
+  const none = withSupport(loadApp(), { sound: false, vibrate: false });
+  none.renderNotifySelect();
+  eq(none._els['setup-notify'].children.map(o => o.value), ['off']);
+  eq(none._els['notify-group'].style.display, 'none', '使えないのに設定が出ている');
+});
+
+test('オフのときは何も鳴らさない', () => {
+  const app = withSupport(loadApp(), { sound: true, vibrate: true });
+  let vibrated = 0;
+  app._ctx.navigator.vibrate = () => { vibrated++; return true; };
+  app.renderNotifySelect();               // 既定はオフ
+  eq(app.fireNotify(), false, 'オフなのに何か鳴った');
+  eq(vibrated, 0);
+  eq(app._els['notify-test'].style.display, 'none', 'オフなのに「試す」が出ている');
+});
+
+test('バイブを選ぶと navigator.vibrate を呼ぶ', () => {
+  const app = withSupport(loadApp(), { sound: false, vibrate: true });
+  let pattern = null;
+  app._ctx.navigator.vibrate = (p) => { pattern = p; return true; };
+  el(app, 'setup-notify').value = 'vibrate';
+  app.onNotifyModeChange();               // 選んだ瞬間に1回鳴る
+  eq(pattern, [200, 100, 200], '振動のパターンが渡っていない');
+  eq(app._storage.getItem('seizu_notify'), 'vibrate');
+  eq(app._els['notify-test'].style.display, '', '「試す」が出ていない');
+  pattern = null;
+  ok(app.fireNotify());
+  eq(pattern, [200, 100, 200]);
+});
+
+test('音を選ぶと Web Audio で鳴らす。鳴らせない端末では false を返す', () => {
+  // 鳴らせる端末（AudioContext の最小スタブ）
+  const made = [];
+  const app = loadApp();
+  app._ctx.AudioContext = function () {
+    this.state = 'running';
+    this.currentTime = 0;
+    this.destination = {};
+    this.createOscillator = () => { made.push('osc'); return {
+      frequency: {}, connect() {}, start() {}, stop() {}
+    }; };
+    this.createGain = () => ({
+      gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}
+    });
+  };
+  delete app._ctx.navigator.vibrate;
+  el(app, 'setup-notify').value = 'sound';
+  app.onNotifyModeChange();
+  eq(app._storage.getItem('seizu_notify'), 'sound');
+  eq(made.length, 2, '短い音を2回鳴らしていない');
+  ok(app.playBeep(), '2回目以降に鳴らせない');
+
+  // 音を出せない端末では例外を投げずに false
+  const noSound = withSupport(loadApp(), { sound: false, vibrate: false });
+  eq(noSound.playBeep(), false);
+  eq(noSound.fireNotify(), false);
 });
 
 // ---------------------------------------------------------------- 実行結果

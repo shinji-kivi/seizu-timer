@@ -600,6 +600,12 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
     <input type="time" id="setup-clock" value="11:00" oninput="updateSetupPreview()">
     <p style="color:var(--text-dim);font-size:0.85rem;margin-top:6px">設定すると、計測中に「本番なら今 15:42」と実時刻に換算して表示します。空欄にすると表示しません。</p>
   </div>
+  <div class="form-group" id="notify-group">
+    <label>工程の目標到達を知らせる</label>
+    <select id="setup-notify" onchange="onNotifyModeChange()"></select>
+    <p id="notify-hint" style="color:var(--text-dim);font-size:0.85rem;margin-top:6px"></p>
+    <button type="button" class="btn btn-outline btn-sm" id="notify-test" style="margin-top:6px;display:none" onclick="testNotify()">試す</button>
+  </div>
   <div class="form-group">
     <label>メモ（任意）</label>
     <textarea id="setup-memo" placeholder="メモを入力..."></textarea>
@@ -888,6 +894,8 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
       <p style="margin-top:6px"><strong>遅れ / 貯金</strong>：累計タイムの下に、目標に対して何分押しているかを表示します。工程ごとの赤字と違い、<strong>全体でどれだけ遅れているか</strong>が分かるので、どこで巻くかの判断に使えます。</p>
       <p style="margin-top:6px"><strong>本番なら 15:42</strong>：開始時刻を設定していると、経過時間を本番の実時刻に換算して表示します。あわせて<strong>残り時間と終了予定時刻</strong>も出るので、「あと何分あるか」を頭の中で計算しなくて済みます。</p>
       <p style="color:var(--text-dim);font-size:0.85rem">計測中は画面が自動で消えないようにします（対応ブラウザのみ）。</p>
+      <p style="margin-top:6px"><strong>目標到達の知らせ</strong>：セッション設定で「音」か「バイブ」を選ぶと、工程の目標時間に達したときに1回知らせます。<strong>既定は「知らせない」</strong>です。作図中で画面を見ていないときに使います。</p>
+      <p style="color:var(--text-dim);font-size:0.85rem;margin-left:12px">端末が対応している手段だけが選択肢に出ます。<strong>iPhone / iPad はバイブに対応していない</strong>ため「音」だけになります。音は端末を消音にしていると鳴らないことがあります</p>
     </div>
   </div>
 
@@ -957,6 +965,11 @@ label { display:block; margin-bottom:6px; font-size:0.9rem; color:var(--text-dim
   <div class="card" id="help-changelog">
     <h3 style="margin-bottom:12px">更新履歴</h3>
     <div style="font-size:0.9rem;line-height:1.7">
+      <p><strong>v1.8.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-09-06</span></p>
+      <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
+        <p>・工程の<strong>目標時間に達したときに知らせる</strong>機能を追加（音 / バイブ）。既定は「知らせない」です</p>
+        <p>・セッション設定から選べます。端末が対応している手段だけが出ます（iPhone / iPad はバイブ非対応のため音のみ）</p>
+      </div>
       <p><strong>v1.7.0</strong><span style="color:var(--text-dim);font-size:0.85rem"> — 2026-09-06</span></p>
       <div style="color:var(--text-dim);font-size:0.85rem;margin:4px 0 12px 12px">
         <p>・分析の「成長推移」に<strong>累計カウンター</strong>（総セッション数 / 練習した日数 / 総練習時間）を追加</p>
@@ -1069,14 +1082,15 @@ const STORAGE_KEYS = {
   introSeen: 'demo_seizu_intro_seen',
   lastVersion: 'demo_seizu_last_version',
   clockStart: 'demo_seizu_clock_start',
-  backupAt: 'demo_seizu_backup_at'
+  backupAt: 'demo_seizu_backup_at',
+  notify: 'demo_seizu_notify'
 };
 
 // バックアップの案内を出す間隔（前回バックアップ時からの記録数）
 const BACKUP_NOTICE_EVERY = 10;
 
 // バージョン。更新履歴(ヘルプ画面)と help.html の表記も合わせて更新すること
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 const APP_VERSION_DATE = '2026-09-06';
 
 // 更新後に1回だけ出す案内の本文。利用者から見て何が変わったかだけを書く
@@ -1449,6 +1463,126 @@ function recalcStats() {
   return stats;
 }
 
+// ----- 目標到達の通知（v1.8.0）
+// 作図中は画面を見ていないので、工程の目標時間に達したことを手を止めずに知れるようにする。
+// 既定はオフ（仕様上「アラート音なし」が既定のため）。
+// iOS / iPadOS の Safari は Vibration API に非対応（WebKit なので Chrome を入れても同じ）なので、
+// 端末が実際に使える手段だけを選択肢に出す。
+const NOTIFY_MODES = ['off', 'sound', 'vibrate'];
+let notifyMode = 'off';       // 計測中に毎回 localStorage を読まないための控え
+let audioCtx = null;
+
+function notifySupport() {
+  return {
+    sound: typeof AudioContext === 'function' || typeof webkitAudioContext === 'function',
+    vibrate: typeof navigator === 'object' && navigator !== null && typeof navigator.vibrate === 'function'
+  };
+}
+
+function getNotifyMode() {
+  const v = localStorage.getItem(STORAGE_KEYS.notify);
+  if (NOTIFY_MODES.indexOf(v) === -1) return 'off';
+  const sup = notifySupport();
+  // 別の端末・ブラウザに移って使えなくなった手段が残っていたらオフに倒す
+  if (v === 'sound' && !sup.sound) return 'off';
+  if (v === 'vibrate' && !sup.vibrate) return 'off';
+  return v;
+}
+
+function setNotifyMode(mode) {
+  if (NOTIFY_MODES.indexOf(mode) === -1) return false;
+  return writeStorage(STORAGE_KEYS.notify, mode);
+}
+
+// 音は Web Audio で作る（音声ファイルを持たないのでオフラインでも鳴る）。
+// iOS は利用者の操作を起点にしないと音が出ないので、「試す」と計測開始で起こしておく
+function ensureAudio() {
+  if (!notifySupport().sound) return null;
+  try {
+    const Ctor = typeof AudioContext === 'function' ? AudioContext : webkitAudioContext;
+    if (!audioCtx) audioCtx = new Ctor();
+    if (audioCtx.state === 'suspended' && typeof audioCtx.resume === 'function') audioCtx.resume();
+    return audioCtx;
+  } catch (e) { return null; }
+}
+
+function playBeep() {
+  const ctx = ensureAudio();
+  if (!ctx) return false;
+  try {
+    const t0 = ctx.currentTime;
+    // 短い音を2回。1回だと作業中の物音に紛れる
+    [0, 0.28].forEach(offset => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, t0 + offset);
+      gain.gain.exponentialRampToValueAtTime(0.3, t0 + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + offset + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t0 + offset);
+      osc.stop(t0 + offset + 0.24);
+    });
+    return true;
+  } catch (e) { return false; }
+}
+
+function fireNotify() {
+  if (notifyMode === 'sound') return playBeep();
+  if (notifyMode === 'vibrate') {
+    try { return navigator.vibrate([200, 100, 200]) !== false; } catch (e) { return false; }
+  }
+  return false;
+}
+
+// 目標に達した瞬間に1回だけ知らせる。同じ工程では鳴らし直さない
+function shouldNotifyStep(stepElapsed, targetTime, notifiedStep, currentStep) {
+  if (!(targetTime > 0)) return false;
+  if (notifiedStep === currentStep) return false;
+  return stepElapsed >= targetTime;
+}
+
+// 端末が対応している手段だけを出す。1つも無ければ設定ごと隠す（押しても何も起きない選択肢を見せない）
+function renderNotifySelect() {
+  const sup = notifySupport();
+  const group = document.getElementById('notify-group');
+  const select = document.getElementById('setup-notify');
+  const opts = [['off', '知らせない']];
+  if (sup.sound) opts.push(['sound', '音で知らせる']);
+  if (sup.vibrate) opts.push(['vibrate', 'バイブで知らせる']);
+  select.innerHTML = '';
+  opts.forEach(pair => {
+    const o = document.createElement('option');
+    o.value = pair[0];
+    o.textContent = pair[1];
+    select.appendChild(o);
+  });
+  const mode = getNotifyMode();
+  select.value = mode;
+  notifyMode = mode;
+  group.style.display = (!sup.sound && !sup.vibrate) ? 'none' : '';
+  document.getElementById('notify-test').style.display = mode === 'off' ? 'none' : '';
+  const hint = document.getElementById('notify-hint');
+  if (mode === 'sound') {
+    hint.textContent = '工程の目標時間に達したら短い音を鳴らします。端末を消音にしていると鳴らないことがあります。';
+  } else if (mode === 'vibrate') {
+    hint.textContent = '工程の目標時間に達したら短く振動します。';
+  } else {
+    hint.textContent = '手を止めずに目標到達が分かります。既定は「知らせない」です。';
+  }
+}
+
+function onNotifyModeChange() {
+  setNotifyMode(document.getElementById('setup-notify').value);
+  renderNotifySelect();
+  // 選んだその場で1回鳴らす。届くかを確かめられるうえ、iOS の音の許可もここで取れる
+  fireNotify();
+}
+
+function testNotify() { fireNotify(); }
+
 // ========================================
 // 3. Navigation
 // ========================================
@@ -1463,7 +1597,7 @@ function showScreen(id) {
   if (id === 'history') renderHistory();
   if (id === 'analysis') renderAnalysis();
   if (id === 'settings') renderSettingsTemplateSelect();
-  if (id === 'setup') onSetupModeChange();
+  if (id === 'setup') { onSetupModeChange(); renderNotifySelect(); }
 }
 
 // ホームの4タイルから直接セッション設定へ。押したタイルのモードを選んだ状態で開く。
@@ -1492,7 +1626,8 @@ let timerState = {
   intervalId: null,
   laps: [],
   clockStart: null,  // 本番の開始時刻（0時からの分数）。null なら実時刻換算を出さない
-  stars: 0           // セッション全体の星評価（1〜5）。0 は未評価
+  stars: 0,          // セッション全体の星評価（1〜5）。0 は未評価
+  notifiedStep: -1   // 目標到達を知らせ済みの工程番号。同じ工程で鳴らし直さないための目印
 };
 
 
@@ -1508,6 +1643,7 @@ function saveActiveSession(phase) {
     totalElapsed: timerState.totalElapsed, stepElapsed: timerState.stepElapsed,
     laps: timerState.laps, paused: timerState.paused,
     clockStart: timerState.clockStart,
+    notifiedStep: typeof timerState.notifiedStep === 'number' ? timerState.notifiedStep : -1,
     stars: sessionStars(timerState),
     completed: !!timerState.completed,
     savedAt: Date.now()
@@ -1558,6 +1694,8 @@ function tryResumeSession() {
       stepElapsed: data.stepElapsed + elapsed,
       intervalId: null, laps: data.laps,
       clockStart: typeof data.clockStart === 'number' ? data.clockStart : null,
+      // 中断前の記録が無ければ「知らせ済み」として復元する（開き直した瞬間に鳴らないように）
+      notifiedStep: typeof data.notifiedStep === 'number' ? data.notifiedStep : data.currentStep,
       stars: sessionStars(data)
     };
     showScreen('timer');
@@ -1616,9 +1754,12 @@ function startSession() {
     steps: JSON.parse(JSON.stringify(tpl.steps)),
     currentStep: 0, totalElapsed: 0, stepElapsed: 0,
     intervalId: null, laps: [], completed: false,
-    stars: 0,
+    stars: 0, notifiedStep: -1,
     clockStart: parseClockInput(clockRaw)
   };
+  // 開始のタップを起点に音を起こしておく（iOS は操作なしでは鳴らせない）
+  notifyMode = getNotifyMode();
+  if (notifyMode === 'sound') ensureAudio();
   showScreen('timer');
   renderTimerUI();
   timerState.intervalId = setInterval(timerTick, 100);
@@ -1637,6 +1778,15 @@ function timerTick() {
   timerState.totalElapsed += delta;
   timerState.stepElapsed += delta;
   updateTimerDisplay();
+  if (notifyMode !== 'off') {
+    const cur = timerState.steps[timerState.currentStep];
+    if (cur && shouldNotifyStep(timerState.stepElapsed, cur.targetTime,
+                                timerState.notifiedStep, timerState.currentStep)) {
+      timerState.notifiedStep = timerState.currentStep;
+      fireNotify();
+      saveActiveSession();
+    }
+  }
   if (now - lastSaveTime > 5000) { lastSaveTime = now; saveActiveSession(); }
 }
 
@@ -1731,6 +1881,10 @@ function undoLap() {
   const last = timerState.laps.pop();
   timerState.currentStep = Math.max(0, timerState.currentStep - 1);
   timerState.stepElapsed += last.actualTime;
+  // 戻った先が既に目標を過ぎているなら知らせ直さない（押し間違いの取り消しで鳴るのは邪魔）
+  const back = timerState.steps[timerState.currentStep];
+  timerState.notifiedStep = (back && timerState.stepElapsed >= back.targetTime)
+    ? timerState.currentStep : -1;
   renderTimerUI();
   saveActiveSession();
 }
@@ -3291,6 +3445,7 @@ function generateDemoData() {
 
 loadThemeColor();
 restoreClockStart();
+notifyMode = getNotifyMode();
 document.getElementById('help-version').textContent = 'v' + APP_VERSION + '（' + APP_VERSION_DATE + '）';
 generateDemoData();
 const savedScreen = localStorage.getItem('demo_seizu_screen');

@@ -20,6 +20,7 @@
 - **遅れ / 貯金の表示** — 目標に対して全体で何分押しているかを常時表示。工程ごとの赤字と違い、どこで巻くべきかの判断に使える
 - **本番時刻への換算** — 開始時刻を設定すると「本番なら今 15:42・残り 1時間48分（終了 17:30）」と表示
 - **1つ戻す** — ラップの押し間違いを取り消せる。取り消した分の経過時間は前の工程に足し戻るので累計はずれない
+- **目標到達の知らせ**（音 / バイブ・既定オフ） — 作図中で画面を見ていないときに、工程の目標時間に達したことを手を止めずに知れる。端末が対応している手段だけが選択肢に出る（iPhone / iPad は Vibration API 非対応のため音のみ）
 - **画面スリープの防止**（対応ブラウザのみ）
 - 一時停止・途中終了に対応。**途中終了した回はベストタイム・成長グラフの対象外**になる
 - 計測中にページを閉じても復元できる
@@ -123,7 +124,7 @@ src = src.replace('<title>製図時間管理ツール</title>', '<title>製図�
 src = src.replace('<link rel="manifest" href="manifest.json">\n', '')   # デモはインストール対象外
 for k in ['seizu_sessions','seizu_templates','seizu_stats','seizu_active_session',
           'seizu_screen','seizu_theme_color','seizu_intro_seen','seizu_last_version',
-          'seizu_clock_start','seizu_backup_at']:
+          'seizu_clock_start','seizu_backup_at','seizu_notify']:
     src = src.replace("'%s'" % k, "'demo_%s'" % k)
 
 anchor_fn = '\nloadThemeColor();\n'
